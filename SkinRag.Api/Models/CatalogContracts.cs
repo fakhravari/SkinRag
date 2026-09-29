@@ -20,7 +20,7 @@ public class CatalogFilters : IValidatableObject
     public bool? FragranceFree { get; set; }
     [MaxLength(20)] public string[] ExcludeIngredientSlugs { get; set; } = [];
 
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    public virtual IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (MinPrice > MaxPrice)
             yield return new ValidationResult("حداقل قیمت نباید از حداکثر بیشتر باشد.", [nameof(MinPrice), nameof(MaxPrice)]);
@@ -46,9 +46,12 @@ public sealed record ProductDto(int Id, string? Sku, string Name, string? Brand,
     string? UsageInstructions, string[] Profiles, string[] Concerns, string[] Ingredients,
     IReadOnlyList<VariantDto> Variants);
 
-public sealed record ProductMatch(ProductDto Product, double Similarity, double Score);
+public sealed record ProductMatch(ProductDto Product, double Similarity, double Score, string? Reason = null);
+public sealed record ProductRecommendation(int ProductId, string Reason);
 public sealed record ConsultationResponse(string Answer, IReadOnlyList<ProductMatch> Products,
     string Currency, string RetrievalMethod, int EligibleProducts, DateTime? IndexUpdatedAtUtc, bool IsDemo,
-    string ResponseMode = "model", string? Notice = null);
+    string ResponseMode = "model", string? Notice = null, string Intent = "PRODUCT_SEARCH",
+    double IntentConfidence = 1, Guid? ConversationId = null, bool NeedsMoreInformation = false,
+    string? FollowUpQuestion = null, IReadOnlyList<ProductRecommendation>? Recommendations = null);
 
 public sealed record CatalogPage(int Page, int PageSize, int Total, IReadOnlyList<ProductDto> Items);
