@@ -9,6 +9,8 @@ public sealed record ConversationState(Guid Id, string[] UserQuestions, int[] Pr
 {
     public string? SearchQuery { get; init; }
     public CatalogFilters? SearchFilters { get; init; }
+    public string[] RecentUserMessages { get; init; } = [];
+    public decimal? PendingBudgetRials { get; init; }
 }
 
 // Product references come only from validated server results, never client assistant history.
@@ -23,11 +25,37 @@ public sealed class ConversationStore : IDisposable
         var next = previous with
         {
             UserQuestions = previous.UserQuestions.Append(question).TakeLast(4).ToArray(),
+            RecentUserMessages = previous.RecentUserMessages.Append(question).TakeLast(4).ToArray(),
+            PendingBudgetRials = null,
             ProductIds = ids.Distinct().Take(10).ToArray(),
             UpdatedAtUtc = DateTime.UtcNow,
             SearchQuery = plan?.Intent is ConsultationIntent.ProductSearch or ConsultationIntent.SkinConsultation or ConsultationIntent.RoutineRecommendation or ConsultationIntent.FollowUp ? plan.Query : previous.SearchQuery,
             SearchFilters = plan?.Intent is ConsultationIntent.ProductSearch or ConsultationIntent.SkinConsultation or ConsultationIntent.RoutineRecommendation or ConsultationIntent.FollowUp ? QueryBuilder.CopyFilters(plan.Filters) : previous.SearchFilters
         };
+        Store(next);
+    }
+
+    public void SaveConversation(ConversationState previous, string message)
+    {
+        Store(previous with
+        {
+            RecentUserMessages = previous.RecentUserMessages.Append(message).TakeLast(4).ToArray(),
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+    }
+
+    public void SaveBudget(ConversationState previous, string message, decimal maximumPriceRials)
+    {
+        Store(previous with
+        {
+            PendingBudgetRials = maximumPriceRials,
+            RecentUserMessages = previous.RecentUserMessages.Append(message).TakeLast(4).ToArray(),
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+    }
+
+    private void Store(ConversationState next)
+    {
         _cache.Set(
             next.Id,
             next,
@@ -38,7 +66,11 @@ public sealed class ConversationStore : IDisposable
             });
     }
 
-    public static bool IsRepeated(ConversationState state, string question) => DateTime.UtcNow - state.UpdatedAtUtc < TimeSpan.FromSeconds(30) && state.UserQuestions.Length >= 3
-        && state.UserQuestions.TakeLast(3).All(x => x == question);
+    public static bool IsRepeated(ConversationState state, string question)
+    {
+        var recent = state.RecentUserMessages.Length > 0 ? state.RecentUserMessages : state.UserQuestions;
+        return DateTime.UtcNow - state.UpdatedAtUtc < TimeSpan.FromSeconds(30)
+            && recent.Length >= 3 && recent.TakeLast(3).All(x => x == question);
+    }
     public void Dispose() => _cache.Dispose();
 }

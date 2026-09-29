@@ -41,9 +41,7 @@ public static class ServiceCollectionExtensions
 
     private static void AddRateLimitPolicy(RateLimiterOptions options, string name, int permitLimit)
     {
-        options.AddPolicy(
-            name,
-            context => RateLimitPartition.GetFixedWindowLimiter(
+        options.AddPolicy(name, context => RateLimitPartition.GetFixedWindowLimiter(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
@@ -63,8 +61,7 @@ public static class ServiceCollectionExtensions
 
     private static void AddModelServices(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddHttpClient(
-            "Ollama",
+        services.AddHttpClient("Ollama",
             client =>
             {
                 client.BaseAddress = new Uri(configuration["Ollama:BaseUrl"] ?? "http://localhost:11434");

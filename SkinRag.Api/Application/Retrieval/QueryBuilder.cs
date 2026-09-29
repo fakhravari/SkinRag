@@ -1,8 +1,8 @@
-using System.Globalization;
 using System.Text.RegularExpressions;
 using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Consultation;
 using SkinRag.Api.Application.Intent;
+using SkinRag.Api.Application.Parsing;
 using SkinRag.Api.Infrastructure;
 using SkinRag.Api.Models;
 using SkinRag.Api.Prompts;
@@ -13,12 +13,6 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
 {
     [GeneratedRegex(@"(?:#|\[|شناسه\s*)([0-9]{1,10})(?:\]|\b)")]
     private static partial Regex ProductReferences();
-    [GeneratedRegex(@"(?:تا|زیر|حداکثر|بودجه(?:\s+من)?(?:\s+تا)?|سقف(?:\s+قیمت)?)\s*(?:قیمت\s*)?([0-9]+(?:[.,٫٬][0-9]+)*)\s*(هزار|میلیون)?\s*(تومان|تومن|ریال)")]
-    private static partial Regex MaximumPrice();
-    [GeneratedRegex(@"(?:تا|زیر|حداکثر|بودجه|سقف)\s*(?:من\s*)?(?:قیمت\s*)?[0-9]")]
-    private static partial Regex BudgetAmount();
-    [GeneratedRegex(@"^[0-9]{1,3}(?:[.,٬][0-9]{3})+$")]
-    private static partial Regex GroupedNumber();
 
     public async Task<SearchPlan> BuildAsync(
         ConsultationRequest request,
@@ -29,8 +23,9 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         CancellationToken ct)
     {
         var ids = ReferencedIds(message);
-        var writtenBudget = ParseMaximumPrice(message);
-        if (request.MaxPrice is null && writtenBudget is null && BudgetAmount().IsMatch(message))
+        var budgetInput = BudgetParser.Parse(message);
+        var writtenBudget = budgetInput.MaximumPriceRials;
+        if (request.MaxPrice is null && budgetInput.NeedsClarification)
         {
             return new(
                 message,
@@ -40,7 +35,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
                 false,
                 [],
                 NeedsMoreInformation: true,
-                FollowUpQuestion: "مبلغ بودجه را با واحد ریال یا تومان می‌فرمایید؟",
+                FollowUpQuestion: budgetInput.FollowUpQuestion,
                 Source: "ambiguous-budget");
         }
 
@@ -83,7 +78,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         if (ids.Length > 0)
         {
             var explicitFilters = CopyFilters(request);
-            explicitFilters.MaxPrice ??= writtenBudget;
+            explicitFilters.MaxPrice ??= writtenBudget ?? conversation.PendingBudgetRials;
             return new(
                 message,
                 explicitFilters,
@@ -100,7 +95,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             && (request.SkinType is not null || request.HairType is not null || request.Domain == "beauty"))
         {
             var explicitFilters = CopyFilters(request);
-            explicitFilters.MaxPrice ??= writtenBudget;
+            explicitFilters.MaxPrice ??= writtenBudget ?? conversation.PendingBudgetRials;
             return new(
                 message,
                 explicitFilters,
@@ -210,44 +205,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         .Take(10)
         .ToArray();
 
-    public static decimal? ParseMaximumPrice(string text)
-    {
-        var match = MaximumPrice().Match(text);
-        if (!match.Success)
-        {
-            return null;
-        }
-
-        var number = match.Groups[1].Value;
-        number = GroupedNumber().IsMatch(number) ? number.Replace(",", "").Replace(".", "").Replace("٬", "") : number.Replace('٫', '.').Replace(',', '.');
-        if (!decimal.TryParse(number, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var amount))
-        {
-            throw new ArgumentException("مبلغ بودجه نامعتبر است.");
-        }
-
-        if (amount > 1000000000)
-        {
-            throw new ArgumentException("بودجه از سقف مجاز یک میلیارد ریال بیشتر است.");
-        }
-
-        amount *= match.Groups[2].Value switch
-        {
-            "هزار" => 1000,
-            "میلیون" => 1000000,
-            _ => 1
-        };
-        if (match.Groups[3].Value is "تومان" or "تومن")
-        {
-            amount *= 10;
-        }
-
-        if (amount > 1000000000)
-        {
-            throw new ArgumentException("بودجه از سقف مجاز یک میلیارد ریال بیشتر است.");
-        }
-
-        return amount;
-    }
+    public static decimal? ParseMaximumPrice(string text) => BudgetParser.Parse(text).MaximumPriceRials;
 
     public static CatalogFilters CopyFilters(CatalogFilters f) => new()
     {
@@ -459,7 +417,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         filters.HairType ??= filters.Domain is null or "hair" ? parsed.HairType : null;
         filters.BrandSlug ??= parsed.BrandSlug;
         filters.FragranceFree ??= parsed.FragranceFree;
-        filters.MaxPrice ??= writtenBudget;
+        filters.MaxPrice ??= writtenBudget ?? conversation.PendingBudgetRials;
         filters.ExcludeIngredientSlugs = filters.ExcludeIngredientSlugs.Concat(parsed.ExcludeIngredientSlugs).Distinct().ToArray();
         if (decision.Intent == ConsultationIntent.FollowUp && conversation.SearchFilters is
             {

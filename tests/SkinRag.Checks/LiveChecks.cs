@@ -41,11 +41,16 @@ internal static class LiveChecks
             return result;
         }
 
-        var greeting = await Ask(new { question = "سلام رفیق خوبی؟" });
+        var greeting = await Ask(new { question = "سلام" });
         Check(
             greeting.GetProperty("intent").GetString() == "GREETING"
             && greeting.GetProperty("retrievalMethod").GetString() == "none",
             "Greeting did not bypass retrieval");
+        var smallTalk = await Ask(new { question = "سلام رفیق خوبی؟" });
+        Check(smallTalk.GetProperty("intent").GetString() == "SMALL_TALK"
+            && smallTalk.GetProperty("conversationTopic").GetString() == "Wellbeing"
+            && smallTalk.GetProperty("retrievalMethod").GetString() == "none",
+            "Small talk did not bypass retrieval");
         var joke = await Ask(new { message = "یه جوک درباره کرم بگو 😂" });
         Check(
             joke.GetProperty("intent").GetString() == "OFF_TOPIC"

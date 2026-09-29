@@ -32,8 +32,7 @@ public static class WebApplicationExtensions
         app.MapControllers();
         app.MapGet("/", () => Results.Redirect("/chat"));
         app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
-        app.MapGet(
-            "/health/ready",
+        app.MapGet("/health/ready",
             async (IDbContextFactory<AppDbContext> factory, KnowledgeIndexService index, CancellationToken ct) =>
             {
                 await using var db = await factory.CreateDbContextAsync(ct);

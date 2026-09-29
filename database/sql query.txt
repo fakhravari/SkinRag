@@ -1,0 +1,18 @@
+SELECT * FROM [dbo].[Products] where Price=635000
+
+SELECT c.* FROM dbo.ProductConcerns p
+left join dbo.Concerns c on c.Id = p.ConcernId
+where p.ProductId=155
+
+SELECT s.* FROM dbo.ProductIngredients e 
+left join dbo.Ingredients s on s.Id = e.IngredientId
+where e.ProductId=155
+
+SELECT l.* FROM dbo.ProductProfiles p 
+left join dbo.Profiles l on l.Id = p.ProfileId
+where p.ProductId=155
+
+SELECT * FROM dbo.ProductVariants p where p.ProductId=155
+SELECT * FROM dbo.ProductEmbeddings where ProductId=155
+
+

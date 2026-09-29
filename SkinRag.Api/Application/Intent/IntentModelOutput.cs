@@ -9,4 +9,13 @@ public sealed class IntentModelOutput
 
     [JsonRequired]
     public double Confidence { get; init; }
+
+    [JsonRequired]
+    public string? ConversationTopic { get; init; }
+
+    [JsonRequired]
+    public string? Clarification { get; init; }
+
+    [JsonRequired]
+    public bool RequiresContext { get; init; }
 }

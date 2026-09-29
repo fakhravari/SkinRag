@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using SkinRag.Api.Application.Abstractions;
+using SkinRag.Api.Application.Parsing;
 using SkinRag.Api.Infrastructure;
 using SkinRag.Api.Prompts;
 using SkinRag.Api.Services;
@@ -15,11 +16,20 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
     [GeneratedRegex(@"^(?:محصول )?[0-9]+ (?:موجوده|موجود است|موجود هست)$")]
     private static partial Regex AvailabilityReference();
 
-    public async Task<IntentDecision> ClassifyAsync(string message, IReadOnlyList<string> previousQuestions, CancellationToken ct)
+    [GeneratedRegex(@"^(?:(?:یه|یک|یکی|گزینه|محصول) )?(?:ارزان|ارزون) ?تر(?:ش)?(?: (?:چی|چیه|هم|داری|هست|موجوده|میخوام|میخواهم))*$")]
+    private static partial Regex BudgetFollowUp();
+
+    public Task<IntentDecision> ClassifyAsync(string message, IReadOnlyList<string> previousQuestions, CancellationToken ct) =>
+        ClassifyAsync(message, new IntentContext(previousQuestions, previousQuestions, previousQuestions.Count > 0), ct);
+
+    public async Task<IntentDecision> ClassifyAsync(string message, IntentContext context, CancellationToken ct)
     {
-        if (ConversationReplies.GetReply(message) is not null)
+        if (ConversationReplies.GetTopic(message) is { } topic)
         {
-            return new(ConsultationIntent.Greeting, 1, "rules");
+            return new(topic == ConversationTopic.Greeting ? ConsultationIntent.Greeting : ConsultationIntent.SmallTalk, 1, "rules")
+            {
+                ConversationTopic = topic
+            };
         }
         // Obvious unrelated requests stop before any model, SQL or embeddings.
         var normalized = PersianText.Normalize(message);
@@ -50,9 +60,36 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
             "ترکیباتش چیه" or "ترکیباتش چیست" or "روش مصرفش چیه" => ConsultationIntent.ProductDetails,
             _ => (ConsultationIntent?)null
         };
+        if (BudgetFollowUp().IsMatch(normalized))
+        {
+            shortIntent = ConsultationIntent.FollowUp;
+        }
         if (shortIntent.HasValue)
         {
-            return new(previousQuestions.Count > 0 ? shortIntent.Value : ConsultationIntent.Unclear, 1, "context-rule");
+            return new(context.HasProductContext ? shortIntent.Value : ConsultationIntent.Unclear, 1, "context-rule")
+            {
+                RequiresContext = true,
+                Clarification = context.HasProductContext ? null : ClarificationKind.ProductReference
+            };
+        }
+
+        var budget = BudgetParser.Parse(message);
+        if (budget.IsBudgetOnly)
+        {
+            if (budget.NeedsClarification)
+            {
+                return new(ConsultationIntent.Unclear, 1, "budget-rule")
+                {
+                    Clarification = budget.Status == BudgetStatus.MissingCurrency
+                        ? ClarificationKind.BudgetCurrency : ClarificationKind.BudgetAmount
+                };
+            }
+
+            return new(context.HasProductContext ? ConsultationIntent.FollowUp : ConsultationIntent.Unclear, 1, "budget-rule")
+            {
+                RequiresContext = context.HasProductContext,
+                Clarification = context.HasProductContext ? null : ClarificationKind.ProductType
+            };
         }
 
         try
@@ -62,22 +99,29 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
                 new
                 {
                     message,
-                    previousUserQuestions = previousQuestions.TakeLast(2)
+                    recentUserMessages = context.RecentUserMessages.TakeLast(2),
+                    productQuestions = context.ProductQuestions.TakeLast(2),
+                    hasProductContext = context.HasProductContext
                 },
                 PipelinePrompts.IntentSchema,
                 new(
                 "Intent",
                 configuration.GetValue("Consultation:IntentTimeoutSeconds", 70),
-                configuration.GetValue("Consultation:IntentMaxTokens", 64)),
+                configuration.GetValue("Consultation:IntentMaxTokens", 128)),
                 ct);
             if (!TryValidate(output, configuration.GetValue("Consultation:MinimumIntentConfidence", .65), out var decision))
             {
                 return new(ConsultationIntent.Unclear, 0, "invalid-model-output");
             }
 
-            if (decision.Intent == ConsultationIntent.Greeting && ConversationReplies.GetReply(message) is null)
+            if ((decision.RequiresContext || decision.Intent == ConsultationIntent.FollowUp) && !context.HasProductContext)
             {
-                return new(ConsultationIntent.Unclear, decision.Confidence, "model");
+                return decision with
+                {
+                    Intent = ConsultationIntent.Unclear,
+                    ConversationTopic = null,
+                    Clarification = ClarificationKind.ProductReference
+                };
             }
 
             return decision;
@@ -102,7 +146,47 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
             return false;
         }
 
-        decision = new(output.Confidence < minimum ? ConsultationIntent.Unclear : intent, output.Confidence, "model");
+        if (!TryOptionalEnum<ConversationTopic>(output.ConversationTopic, out var topic)
+            || !TryOptionalEnum<ClarificationKind>(output.Clarification, out var clarification))
+        {
+            return false;
+        }
+
+        var isSocial = intent is ConsultationIntent.Greeting or ConsultationIntent.SmallTalk;
+        if ((intent == ConsultationIntent.SmallTalk && (topic is null or ConversationTopic.Greeting))
+            || (intent == ConsultationIntent.Greeting && topic is not (null or ConversationTopic.Greeting))
+            || (!isSocial && topic is not null)
+            || (isSocial && output.RequiresContext)
+            || (intent != ConsultationIntent.Unclear && clarification is not null))
+        {
+            return false;
+        }
+
+        var uncertain = output.Confidence < minimum;
+        decision = new(uncertain ? ConsultationIntent.Unclear : intent, output.Confidence, "model")
+        {
+            ConversationTopic = uncertain ? null : topic,
+            Clarification = uncertain ? ClarificationKind.General : clarification,
+            RequiresContext = output.RequiresContext
+        };
+        return true;
+    }
+
+    private static bool TryOptionalEnum<T>(string? value, out T? parsed) where T : struct, Enum
+    {
+        parsed = null;
+        if (value is null)
+        {
+            return true;
+        }
+
+        var name = Enum.GetNames<T>().FirstOrDefault(n => n.Equals(value, StringComparison.OrdinalIgnoreCase));
+        if (name is null)
+        {
+            return false;
+        }
+
+        parsed = Enum.Parse<T>(name);
         return true;
     }
 

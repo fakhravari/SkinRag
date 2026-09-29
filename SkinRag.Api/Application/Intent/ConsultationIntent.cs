@@ -13,14 +13,20 @@ public enum ConsultationIntent
     FollowUp,
     OffTopic,
     Unsafe,
-    Unclear
+    Unclear,
+    SmallTalk
 }
 
 public sealed record IntentDecision(ConsultationIntent Intent, double Confidence, string Source)
 {
+    public ConversationTopic? ConversationTopic { get; init; }
+    public ClarificationKind? Clarification { get; init; }
+    public bool RequiresContext { get; init; }
+
     public string Code => IntentCodes.ToCode(Intent);
 
-    public bool IsRelevant => Intent is not (ConsultationIntent.Greeting or ConsultationIntent.OffTopic or ConsultationIntent.Unsafe or ConsultationIntent.Unclear);
+    public bool IsRelevant => Intent is not (ConsultationIntent.Greeting or ConsultationIntent.SmallTalk
+        or ConsultationIntent.OffTopic or ConsultationIntent.Unsafe or ConsultationIntent.Unclear);
 }
 
 public static class IntentCodes
@@ -28,6 +34,7 @@ public static class IntentCodes
     private static readonly Dictionary<string, ConsultationIntent> Codes = new(StringComparer.Ordinal)
     {
         ["GREETING"] = ConsultationIntent.Greeting,
+        ["SMALL_TALK"] = ConsultationIntent.SmallTalk,
         ["SKIN_CONSULTATION"] = ConsultationIntent.SkinConsultation,
         ["PRODUCT_SEARCH"] = ConsultationIntent.ProductSearch,
         ["PRODUCT_DETAILS"] = ConsultationIntent.ProductDetails,

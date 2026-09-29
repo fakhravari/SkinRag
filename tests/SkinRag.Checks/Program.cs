@@ -109,7 +109,8 @@ foreach (var code in IntentCodes.All)
         IntentClassifier.TryValidate(new()
         {
             Intent = code,
-            Confidence = .9
+            Confidence = .9,
+            ConversationTopic = code == "SMALL_TALK" ? "CasualChat" : null
         }, .65, out var decision)
         && decision.Code == code,
         "Valid intent rejected");
@@ -158,7 +159,7 @@ RejectJson("{\"intent\":\"PRODUCT_SEARCH\"}");
 RejectJson("{\"intent\":\"PRODUCT_SEARCH\",\"confidence\":1,\"answer\":\"invented\"}");
 RejectJson("{\"intent\":\"PRODUCT_SEARCH\",\"intent\":\"OFF_TOPIC\",\"confidence\":1}");
 Check(
-    OllamaClient.ParseStructured<IntentModelOutput>("{\"intent\":\"PRODUCT_SEARCH\",\"confidence\":0.9}")
+    OllamaClient.ParseStructured<IntentModelOutput>("{\"intent\":\"PRODUCT_SEARCH\",\"confidence\":0.9,\"conversationTopic\":null,\"clarification\":null,\"requiresContext\":false}")
     .Confidence == .9,
     "Valid JSON rejected");
 Check(QueryBuilder.ParseMaximumPrice("تا 500 هزار تومان") == 5000000, "Toman conversion failed");
@@ -458,7 +459,13 @@ for (var i = 0; i < 3; i++)
 }
 
 Check(ConversationStore.IsRepeated(repeatState, "کرم"), "Repeated-message guard failed");
-Console.WriteLine($"{checks} checks passed. Greeting, routing, query contracts, JSON, live-stock/price validation, conversation and fallback verified.");
+await IntentChecks.RunAsync(Check);
+Console.WriteLine($"{checks} checks passed. Social intent, routing, query contracts, JSON, live-stock/price validation, conversation and fallback verified.");
+if (args.Contains("--intent-live"))
+{
+    var filterIndex = Array.IndexOf(args, "--intent-filter");
+    await IntentChecks.RunLiveAsync(filterIndex >= 0 && filterIndex + 1 < args.Length ? args[filterIndex + 1] : null);
+}
 if (args.Contains("--live"))
 {
     var baseIndex = Array.IndexOf(args, "--base-url");

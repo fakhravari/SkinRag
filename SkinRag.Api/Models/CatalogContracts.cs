@@ -128,6 +128,8 @@ public sealed record ConsultationResponse(
     Guid? ConversationId = null,
     bool NeedsMoreInformation = false,
     string? FollowUpQuestion = null,
-    IReadOnlyList<ProductRecommendation>? Recommendations = null);
+    IReadOnlyList<ProductRecommendation>? Recommendations = null,
+    string? ConversationTopic = null,
+    string? ClarificationKind = null);
 
 public sealed record CatalogPage(int Page, int PageSize, int Total, IReadOnlyList<ProductDto> Items);
