@@ -1,8 +1,7 @@
+using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Application.Retrieval;
 using SkinRag.Api.Application.Validation;
-using SkinRag.Api.Application.Abstractions;
-using SkinRag.Api.Infrastructure.Persistence;
 using SkinRag.Api.Models;
 using SkinRag.Api.Prompts;
 using SkinRag.Api.Services;
@@ -10,16 +9,16 @@ using SkinRag.Api.Services;
 namespace SkinRag.Api.Application.Consultation;
 
 public sealed class ConsultationService(
-            InputGuard guard,
-            IIntentClassifier classifier,
-            IQueryBuilder queryBuilder,
-            IProductRepository repository,
-            IProductRetriever retriever,
-            IOllamaClient ollama,
-            RecommendationValidator validator,
-            ConversationStore conversations,
-            IConfiguration configuration,
-            ILogger<ConsultationService> logger)
+    InputGuard guard,
+    IIntentClassifier classifier,
+    IQueryBuilder queryBuilder,
+    IProductRepository repository,
+    IProductRetriever retriever,
+    IOllamaClient ollama,
+    RecommendationValidator validator,
+    ConversationStore conversations,
+    IConfiguration configuration,
+    ILogger<ConsultationService> logger)
 {
     public async Task<ConsultationResponse> AskAsync(ConsultationRequest request, CancellationToken ct)
     {
@@ -45,44 +44,43 @@ public sealed class ConsultationService(
         deadline.CancelAfter(TimeSpan.FromSeconds(configuration.GetValue("Consultation:TimeoutSeconds", 220)));
         ct = deadline.Token;
         var priorQuestions = state.UserQuestions.Length > 0 ? state.UserQuestions : request.History.Where(h => h.Role == "user").TakeLast(2).Select(h => InputNormalizer.Normalize(h.Content))
-
-                .ToArray();
+            .ToArray();
         var intent = await classifier.ClassifyAsync(message, priorQuestions, ct);
         ConsultationResponse Direct(string answer, string mode, bool more = false, string? followUp = null, string? notice = null) => new(
-                        answer,
-                        [],
-                        "IRR",
-                        "none",
-                        0,
-                        null,
-                        false,
-                        mode,
-                        notice,
-                        intent.Code,
-                        intent.Confidence,
-                        state.Id,
-                        more,
-                        followUp,
-                        []);
+            answer,
+            [],
+            "IRR",
+            "none",
+            0,
+            null,
+            false,
+            mode,
+            notice,
+            intent.Code,
+            intent.Confidence,
+            state.Id,
+            more,
+            followUp,
+            []);
         if (!intent.IsRelevant)
         {
             return intent.Intent switch
             {
                 ConsultationIntent.Greeting => Direct(
-                                        ConversationReplies.GetReply(message) ?? "سلام! برای انتخاب محصولات پوست، مو و زیبایی کمکتان می‌کنم.",
-                                        "conversation"),
+                ConversationReplies.GetReply(message) ?? "سلام! برای انتخاب محصولات پوست، مو و زیبایی کمکتان می‌کنم.",
+                "conversation"),
                 ConsultationIntent.OffTopic => Direct(
-                                        "من درباره محصولات پوست، مو و زیبایی پاسخ می‌دهم. لطفاً پرسشی در همین زمینه بنویسید.",
-                                        "off-topic"),
+                "من درباره محصولات پوست، مو و زیبایی پاسخ می‌دهم. لطفاً پرسشی در همین زمینه بنویسید.",
+                "off-topic"),
                 ConsultationIntent.Unsafe => Direct(
-                                        "برای این درخواست نمی‌توانم راهنمایی بدهم. می‌توانم اطلاعات ثبت‌شده و روش مصرف محصولات پوست، مو و زیبایی را بررسی کنم.",
-                                        "unsafe"),
+                "برای این درخواست نمی‌توانم راهنمایی بدهم. می‌توانم اطلاعات ثبت‌شده و روش مصرف محصولات پوست، مو و زیبایی را بررسی کنم.",
+                "unsafe"),
                 _ => Direct(
-                                        "لطفاً نوع محصول یا نیازتان درباره پوست، مو و زیبایی را واضح‌تر بنویسید.",
-                                        "clarification",
-                                        true,
-                                        GroundedAnswers.FollowUps[2],
-                                        intent.Source == "classifier-unavailable" ? "سرویس تشخیص درخواست موقتاً پاسخ نداد؛ لطفاً دوباره تلاش کنید." : null)
+                "لطفاً نوع محصول یا نیازتان درباره پوست، مو و زیبایی را واضح‌تر بنویسید.",
+                "clarification",
+                true,
+                GroundedAnswers.FollowUps[2],
+                intent.Source == "classifier-unavailable" ? "سرویس تشخیص درخواست موقتاً پاسخ نداد؛ لطفاً دوباره تلاش کنید." : null)
             };
         }
 
@@ -95,29 +93,28 @@ public sealed class ConsultationService(
 
         var retrieval = await retriever.RetrieveAsync(plan, ct);
         ConsultationResponse Result(
-                        string answer,
-                        IReadOnlyList<ProductMatch> products,
-                        string mode,
-                        string? notice = null,
-                        bool more = false,
-                        string? followUp = null) => new(
-                    answer,
-                    products,
-                    "IRR",
-                    retrieval.Method,
-                    retrieval.EligibleProducts,
-                    retrieval.IndexUpdatedAtUtc,
-                    products.Any(p => p.Product.IsDemo),
-                    mode,
-                    notice,
-                    intent.Code,
-                    intent.Confidence,
-                    state.Id,
-                    more,
-                    followUp,
-                    products.Where(p => p.Reason is not null).Select(p => new ProductRecommendation(p.Product.Id, p.Reason!))
-
-        .ToArray());
+            string answer,
+            IReadOnlyList<ProductMatch> products,
+            string mode,
+            string? notice = null,
+            bool more = false,
+            string? followUp = null) => new(
+            answer,
+            products,
+            "IRR",
+            retrieval.Method,
+            retrieval.EligibleProducts,
+            retrieval.IndexUpdatedAtUtc,
+            products.Any(p => p.Product.IsDemo),
+            mode,
+            notice,
+            intent.Code,
+            intent.Confidence,
+            state.Id,
+            more,
+            followUp,
+            products.Where(p => p.Reason is not null).Select(p => new ProductRecommendation(p.Product.Id, p.Reason!))
+            .ToArray());
         ConsultationResponse Finish(ConsultationResponse response)
         {
             if (response.Products.Count > 0)
@@ -131,16 +128,15 @@ public sealed class ConsultationService(
         if (retrieval.Products.Count == 0)
         {
             return Result(
-                                "محصول مرتبطی مطابق فیلترها و اطلاعات فعلی پیدا نشد. نوع محصول یا فیلترها را تغییر دهید.",
-                                [],
-                                "no-results");
+                "محصول مرتبطی مطابق فیلترها و اطلاعات فعلی پیدا نشد. نوع محصول یا فیلترها را تغییر دهید.",
+                [],
+                "no-results");
         }
 
         if (intent.Intent is ConsultationIntent.PriceInquiry or ConsultationIntent.AvailabilityInquiry or ConsultationIntent.ProductDetails or ConsultationIntent.ProductComparison)
         {
             var fresh = (await repository.LoadAsync(retrieval.Products.Select(x => x.Product.Id), plan, ct)).ToDictionary(p => p.Id);
             var matches = retrieval.Products.Where(m => fresh.ContainsKey(m.Product.Id)).Take(2).Select(m => m with { Product = fresh[m.Product.Id] })
-
                 .ToArray();
             if (matches.Length == 0)
             {
@@ -150,21 +146,20 @@ public sealed class ConsultationService(
             if (intent.Intent == ConsultationIntent.ProductComparison && matches.Length < 2)
             {
                 return Result(
-                                        "برای مقایسه، نام یا شناسه دو محصول را مشخص کنید.",
-                                        matches,
-                                        "clarification",
-                                        more: true,
-                                        followUp: "نام یا شناسه دو محصول موردنظر را می‌فرمایید؟");
+                    "برای مقایسه، نام یا شناسه دو محصول را مشخص کنید.",
+                    matches,
+                    "clarification",
+                    more: true,
+                    followUp: "نام یا شناسه دو محصول موردنظر را می‌فرمایید؟");
             }
 
             return Finish(Result(
-                                ConsultationAnswerFormatter.InformationAnswer(matches, intent.Intent, vocabulary),
-                                matches,
-                                "catalog"));
+                ConsultationAnswerFormatter.InformationAnswer(matches, intent.Intent, vocabulary),
+                matches,
+                "catalog"));
         }
 
         var context = retrieval.Products.Where(m => RecommendationValidator.CanRecommend(m.Product, plan.Filters)).Take(2)
-
             .ToArray();
         if (context.Length == 0)
         {
@@ -180,12 +175,11 @@ public sealed class ConsultationService(
             validated = await validator.ValidateAsync(generated, context, plan, ct);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested
-
             && ex is (OperationCanceledException or HttpRequestException or InvalidModelOutputException))
         {
             logger.LogWarning(
-                                "Consultation generation unavailable ({ErrorType}); validating catalog fallback",
-                                ex.GetType().Name);
+                "Consultation generation unavailable ({ErrorType}); validating catalog fallback",
+                ex.GetType().Name);
         }
 
         if (validated is null)
@@ -196,8 +190,7 @@ public sealed class ConsultationService(
             {
                 Answer = GroundedAnswers.Answers[0],
                 Recommendations = context.Select(x => new ProductRecommendation(x.Product.Id, GroundedAnswers.Reason(x.Product)))
-
-                    .ToList()
+                .ToList()
             };
             validated = await validator.ValidateAsync(fallback, context, plan, ct);
         }
@@ -208,45 +201,45 @@ public sealed class ConsultationService(
         }
 
         var answer = validated.NeedsMoreInformation ? validated.Answer + "\n" + validated.FollowUpQuestion : validated.Answer + "\n" + string.Join(
-                            "\n",
-                            validated.Products.Select(x => $"- [{x.Product.Id}] {x.Product.Name}؛ {ConsultationAnswerFormatter.Price(x.Product)} {x.Reason}"));
+            "\n",
+            validated.Products.Select(x => $"- [{x.Product.Id}] {x.Product.Name}؛ {ConsultationAnswerFormatter.Price(x.Product)} {x.Reason}"));
         if (validated.Products.Any(x => x.Product.IsDemo))
         {
             answer += "\nقیمت و مشخصات این رکوردها هنوز با اطلاعات فروشنده تأیید نشده‌اند.";
         }
 
         return Finish(Result(
-                        answer,
-                        validated.Products,
-                        mode,
-                        notice,
-                        validated.NeedsMoreInformation,
-                        validated.FollowUpQuestion));
+            answer,
+            validated.Products,
+            mode,
+            notice,
+            validated.NeedsMoreInformation,
+            validated.FollowUpQuestion));
     }
 
     private async Task<ConsultationResult> GenerateAnswerAsync(string message, IntentDecision intent, IReadOnlyList<ProductMatch> context, CancellationToken ct)
     {
         return await ollama.ChatStructuredAsync<ConsultationResult>(
-                        PipelinePrompts.Consultation,
-                        new
-                        {
-                            message,
-                            intent = intent.Code,
-                            answerOptions = GroundedAnswers.AnswerCodes.Keys.ToArray(),
-                            followUpOptions = GroundedAnswers.FollowUpCodes.Keys.ToArray(),
-                            products = context.Select(m => new
-                            {
-                                m.Product.Id,
-                                m.Product.Name,
-                                m.Product.Category,
-                                allowedReason = GroundedAnswers.ReasonCode
-                            })
-                        },
-                        ConsultationSchema.Create(context),
-                        new(
-                    "Consultation",
-                    configuration.GetValue("Consultation:AnswerTimeoutSeconds", 60),
-                    configuration.GetValue("Consultation:AnswerMaxTokens", 160)),
-                        ct);
+            PipelinePrompts.Consultation,
+            new
+            {
+                message,
+                intent = intent.Code,
+                answerOptions = GroundedAnswers.AnswerCodes.Keys.ToArray(),
+                followUpOptions = GroundedAnswers.FollowUpCodes.Keys.ToArray(),
+                products = context.Select(m => new
+                {
+                    m.Product.Id,
+                    m.Product.Name,
+                    m.Product.Category,
+                    allowedReason = GroundedAnswers.ReasonCode
+                })
+            },
+            ConsultationSchema.Create(context),
+            new(
+            "Consultation",
+            configuration.GetValue("Consultation:AnswerTimeoutSeconds", 60),
+            configuration.GetValue("Consultation:AnswerMaxTokens", 160)),
+            ct);
     }
 }

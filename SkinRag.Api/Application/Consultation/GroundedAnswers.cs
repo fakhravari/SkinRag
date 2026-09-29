@@ -21,6 +21,7 @@ public static class GroundedAnswers
         ["BUDGET"] = FollowUps[2]
     };
     public const string ReasonCode = "CATALOG_MATCH";
+
     public static string? ResolveAnswer(string? value) => value is null ? null : AnswerCodes.GetValueOrDefault(value) ?? (Answers.Contains(value) ? value : null);
     public static string? ResolveFollowUp(string? value) => value is null ? null : FollowUpCodes.GetValueOrDefault(value) ?? (FollowUps.Contains(value) ? value : null);
     public static string Reason(ProductDto p) => $"این محصول در دسته «{p.Category ?? "محصولات مراقبتی"}» ثبت شده است.";

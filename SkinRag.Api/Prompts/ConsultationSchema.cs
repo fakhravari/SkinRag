@@ -8,8 +8,7 @@ internal static class ConsultationSchema
 {
     public static JsonElement Create(IReadOnlyList<ProductMatch> context)
     {
-        var reasons = new[]
-        {
+        var reasons = new[] {
             GroundedAnswers.ReasonCode
         };
         return PipelinePrompts.Schema(new
@@ -47,10 +46,7 @@ internal static class ConsultationSchema
                         required = new[] { "productId", "reason" }
                     }
                 },
-                needsMoreInformation = new
-                {
-                    type = "boolean"
-                },
+                needsMoreInformation = new { type = "boolean" },
                 followUpQuestion = PipelinePrompts.NullableEnum(GroundedAnswers.FollowUpCodes.Keys)
             },
             required = new[] { "answer", "recommendations", "needsMoreInformation", "followUpQuestion" }

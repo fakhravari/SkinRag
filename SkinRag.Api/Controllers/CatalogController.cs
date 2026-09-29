@@ -12,6 +12,7 @@ public sealed class CatalogController(CatalogService catalog, IDbContextFactory<
 {
     [HttpGet("products")]
     public async Task<ActionResult<CatalogPage>> Products([FromQuery] CatalogSearchRequest request, CancellationToken ct) => Ok(await catalog.SearchAsync(request, ct));
+
     [HttpGet("products/{id:int}")]
     public async Task<ActionResult<ProductDto>> Product(int id, CancellationToken ct)
     {
@@ -36,22 +37,17 @@ public sealed class CatalogController(CatalogService catalog, IDbContextFactory<
                 x.Domain,
                 x.ParentId
             })
-
-                .ToListAsync(ct),
+            .ToListAsync(ct),
             brands = await db.Brands.AsNoTracking().OrderBy(x => x.Id).ToListAsync(ct),
             profiles = await db.Profiles.AsNoTracking().OrderBy(x => x.Id).ToListAsync(ct),
             concerns = await db.Concerns.AsNoTracking().OrderBy(x => x.Id).ToListAsync(ct),
             ingredients = await db.Ingredients.AsNoTracking().OrderBy(x => x.Id).ToListAsync(ct),
             shades = await db.ProductVariants.Where(x => x.IsActive && x.Shade != null).Select(x => x.Shade).Distinct()
-
-                .OrderBy(x => x)
-
-                .ToListAsync(ct),
+            .OrderBy(x => x)
+            .ToListAsync(ct),
             finishes = await db.ProductVariants.Where(x => x.IsActive && x.Finish != null).Select(x => x.Finish).Distinct()
-
-                .OrderBy(x => x)
-
-                .ToListAsync(ct)
+            .OrderBy(x => x)
+            .ToListAsync(ct)
         });
     }
 
@@ -74,8 +70,7 @@ public sealed class CatalogController(CatalogService catalog, IDbContextFactory<
                 products = g.Count(),
                 activeProducts = g.Count(p => p.IsActive)
             })
-
-                .ToListAsync(ct)
+            .ToListAsync(ct)
         });
     }
 }

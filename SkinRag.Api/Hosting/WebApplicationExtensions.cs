@@ -33,20 +33,18 @@ public static class WebApplicationExtensions
         app.MapGet("/", () => Results.Redirect("/chat"));
         app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
         app.MapGet(
-                        "/health/ready",
-                        async (IDbContextFactory<AppDbContext> factory, KnowledgeIndexService index, CancellationToken ct) =>
-        {
-            await using var db = await factory.CreateDbContextAsync(ct);
-            var databaseReady = await db.Database.CanConnectAsync(ct);
-            var knowledgeReady = index.Snapshot().IsReady;
-            return Results.Json(
-                new
+            "/health/ready",
+            async (IDbContextFactory<AppDbContext> factory, KnowledgeIndexService index, CancellationToken ct) =>
+            {
+                await using var db = await factory.CreateDbContextAsync(ct);
+                var databaseReady = await db.Database.CanConnectAsync(ct);
+                var knowledgeReady = index.Snapshot().IsReady;
+                return Results.Json(new
                 {
                     databaseReady,
                     knowledgeReady
-                },
-                statusCode: databaseReady && knowledgeReady ? 200 : 503);
-        });
+                }, statusCode: databaseReady && knowledgeReady ? 200 : 503);
+            });
         return app;
     }
 }

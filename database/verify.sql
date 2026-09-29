@@ -18,7 +18,8 @@ IF (SELECT COUNT(*) FROM dbo.Products WHERE Id IN(1,2,3) AND
     OR (Id=3 AND Name=N'کرم مرطوب‌کننده پوست خشک' AND Price=1800000 AND StockQuantity=10))) <> 3
     THROW 50106, 'Original sample products were changed.', 1;
 DBCC CHECKCONSTRAINTS WITH ALL_CONSTRAINTS;
-SELECT c.Domain,COUNT(*) AS Products FROM dbo.Products p JOIN dbo.Categories c ON c.Id=p.CategoryId GROUP BY c.Domain;
+SELECT c.Domain,
+    COUNT(*) AS Products FROM dbo.Products p JOIN dbo.Categories c ON c.Id=p.CategoryId GROUP BY c.Domain;
 SELECT COUNT(*) AS Variants,SUM(CASE WHEN StockQuantity=0 THEN 1 ELSE 0 END) AS SoldOutVariants,
     SUM(CASE WHEN IsActive=0 THEN 1 ELSE 0 END) AS InactiveVariants FROM dbo.ProductVariants;
 PRINT 'Demo catalog verification passed.';

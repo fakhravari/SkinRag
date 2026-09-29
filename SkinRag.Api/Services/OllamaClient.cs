@@ -1,6 +1,6 @@
 using System.Net.Http.Json;
-using System.Text.Json.Serialization;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using SkinRag.Api.Application.Abstractions;
 
 namespace SkinRag.Api.Services;
@@ -14,6 +14,7 @@ public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfigur
         MaxDepth = 16,
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
+
     public string EmbeddingModel => configuration["Ollama:EmbeddingModel"] ?? "nomic-embed-text";
 
     public async Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken = default)
@@ -39,7 +40,10 @@ public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfigur
         }, cancellationToken);
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<EmbedResponse>(cancellationToken: cancellationToken);
-        if (result?.Embeddings is not { Length: > 0 } embeddings || embeddings.Length != texts.Count
+        if (result?.Embeddings is not
+            {
+                Length: > 0
+            } embeddings || embeddings.Length != texts.Count
             || embeddings.Any(v => v is null || v.Length == 0 || v.Any(x => !float.IsFinite(x)) || !v.Any(x => x != 0)))
         {
             throw new InvalidOperationException("Ollama returned invalid embeddings.");
@@ -68,9 +72,18 @@ public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfigur
                 stream = false,
                 keep_alive = "30m",
                 format = schema,
-                messages = new[] { new { role = "system",
-                        content = systemPrompt + "\nReturn JSON with these fields: " + string.Join(", ", schema.GetProperty("properties").EnumerateObject().Select(p => p.Name)) }, new { role = "user",
-            content = JsonSerializer.Serialize(input, StructuredJsonOptions) } },
+                messages = new[] {
+                    new
+                    {
+                        role = "system",
+                        content = systemPrompt + "\nReturn JSON with these fields: " + string.Join(", ", schema.GetProperty("properties").EnumerateObject().Select(p => p.Name))
+                    },
+                    new
+                    {
+                        role = "user",
+                        content = JsonSerializer.Serialize(input, StructuredJsonOptions)
+                    }
+                },
                 options = new
                 {
                     temperature = 0,

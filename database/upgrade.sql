@@ -44,20 +44,32 @@ CREATE TABLE dbo.Ingredients (
     Name NVARCHAR(100) NOT NULL, InciName NVARCHAR(200) NOT NULL
 );
 IF COL_LENGTH('dbo.Products','Sku') IS NULL ALTER TABLE dbo.Products ADD Sku NVARCHAR(80) NULL;
-IF COL_LENGTH('dbo.Products','CategoryId') IS NULL ALTER TABLE dbo.Products ADD CategoryId INT NULL REFERENCES dbo.Categories(Id);
-IF COL_LENGTH('dbo.Products','BrandId') IS NULL ALTER TABLE dbo.Products ADD BrandId INT NULL REFERENCES dbo.Brands(Id);
-IF COL_LENGTH('dbo.Products','HairTypes') IS NULL ALTER TABLE dbo.Products ADD HairTypes NVARCHAR(300) NULL;
-IF COL_LENGTH('dbo.Products','UsageInstructions') IS NULL ALTER TABLE dbo.Products ADD UsageInstructions NVARCHAR(2000) NULL;
-IF COL_LENGTH('dbo.Products','SearchKeywords') IS NULL ALTER TABLE dbo.Products ADD SearchKeywords NVARCHAR(1000) NULL;
-IF COL_LENGTH('dbo.Products','IsDemo') IS NULL ALTER TABLE dbo.Products ADD IsDemo BIT NOT NULL CONSTRAINT DF_Products_Demo DEFAULT 0;
-IF COL_LENGTH('dbo.Products','FragranceFree') IS NULL ALTER TABLE dbo.Products ADD FragranceFree BIT NULL;
-IF COL_LENGTH('dbo.Products','Currency') IS NULL ALTER TABLE dbo.Products ADD Currency NVARCHAR(3) NOT NULL CONSTRAINT DF_Products_Currency DEFAULT 'IRR';
-IF COL_LENGTH('dbo.Products','UpdatedAtUtc') IS NULL ALTER TABLE dbo.Products ADD UpdatedAtUtc DATETIME2 NOT NULL CONSTRAINT DF_Products_Updated DEFAULT SYSUTCDATETIME();
+IF COL_LENGTH('dbo.Products',
+    'CategoryId') IS NULL ALTER TABLE dbo.Products ADD CategoryId INT NULL REFERENCES dbo.Categories(Id);
+IF COL_LENGTH('dbo.Products',
+    'BrandId') IS NULL ALTER TABLE dbo.Products ADD BrandId INT NULL REFERENCES dbo.Brands(Id);
+IF COL_LENGTH('dbo.Products',
+    'HairTypes') IS NULL ALTER TABLE dbo.Products ADD HairTypes NVARCHAR(300) NULL;
+IF COL_LENGTH('dbo.Products',
+    'UsageInstructions') IS NULL ALTER TABLE dbo.Products ADD UsageInstructions NVARCHAR(2000) NULL;
+IF COL_LENGTH('dbo.Products',
+    'SearchKeywords') IS NULL ALTER TABLE dbo.Products ADD SearchKeywords NVARCHAR(1000) NULL;
+IF COL_LENGTH('dbo.Products',
+    'IsDemo') IS NULL ALTER TABLE dbo.Products ADD IsDemo BIT NOT NULL CONSTRAINT DF_Products_Demo DEFAULT 0;
+IF COL_LENGTH('dbo.Products',
+    'FragranceFree') IS NULL ALTER TABLE dbo.Products ADD FragranceFree BIT NULL;
+IF COL_LENGTH('dbo.Products',
+    'Currency') IS NULL ALTER TABLE dbo.Products ADD Currency NVARCHAR(3) NOT NULL CONSTRAINT DF_Products_Currency DEFAULT 'IRR';
+IF COL_LENGTH('dbo.Products',
+    'UpdatedAtUtc') IS NULL ALTER TABLE dbo.Products ADD UpdatedAtUtc DATETIME2 NOT NULL CONSTRAINT DF_Products_Updated DEFAULT SYSUTCDATETIME();
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.Products') AND name='UX_Products_Sku')
 CREATE UNIQUE INDEX UX_Products_Sku ON dbo.Products(Sku) WHERE Sku IS NOT NULL;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.Products') AND name='IX_Products_Catalog')
-CREATE INDEX IX_Products_Catalog ON dbo.Products(CategoryId, BrandId, IsActive) INCLUDE (Price, StockQuantity);
+CREATE INDEX IX_Products_Catalog ON dbo.Products(CategoryId,
+    BrandId,
+    IsActive) INCLUDE (Price,
+    StockQuantity);
 IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name='CK_Products_PriceStock')
 ALTER TABLE dbo.Products ADD CONSTRAINT CK_Products_PriceStock CHECK (Price>=0 AND StockQuantity>=0);
 
@@ -88,7 +100,9 @@ CREATE TABLE dbo.ProductVariants (
     CONSTRAINT CK_Variants_Unit CHECK (SizeUnit IN ('ml','g','pcs'))
 );
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.ProductVariants') AND name='IX_Variants_Availability')
-CREATE INDEX IX_Variants_Availability ON dbo.ProductVariants(ProductId,IsActive,Price) INCLUDE (StockQuantity);
+CREATE INDEX IX_Variants_Availability ON dbo.ProductVariants(ProductId,
+    IsActive,
+    Price) INCLUDE (StockQuantity);
 IF OBJECT_ID('dbo.ProductEmbeddings','U') IS NULL
 CREATE TABLE dbo.ProductEmbeddings (
     ProductId INT NOT NULL REFERENCES dbo.Products(Id),

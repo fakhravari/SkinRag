@@ -23,8 +23,8 @@ public sealed class KnowledgeIndexWorker(KnowledgeIndexService index, IConfigura
             try
             {
                 await Task.Delay(
-                                        TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue("Rag:RefreshIntervalSeconds", 300), 30, 86400)),
-                                        stoppingToken);
+                    TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue("Rag:RefreshIntervalSeconds", 300), 30, 86400)),
+                    stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

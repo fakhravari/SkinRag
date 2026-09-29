@@ -58,7 +58,10 @@ UPDATE dbo.Categories SET Name = CASE Slug
 UPDATE p SET Category = c.Name,
     Description = CASE WHEN p.Description LIKE N'%ساختگی%'
         OR p.Description LIKE N'%آزمایشی%' OR p.Description LIKE N'%تست%'
-        THEN CONCAT(p.Name, N' از گروه ', c.Name, N'. روش مصرف و مشخصات نهایی را از روی برچسب محصول بررسی کنید.')
+        THEN CONCAT(p.Name,
+            N' از گروه ',
+            c.Name,
+            N'. روش مصرف و مشخصات نهایی را از روی برچسب محصول بررسی کنید.')
         ELSE p.Description END,
     Warnings = CASE WHEN p.Warnings LIKE N'%ساختگی%'
         OR p.Warnings LIKE N'%آزمایشی%' OR p.Warnings LIKE N'%تست%'

@@ -6,12 +6,19 @@ namespace SkinRag.Api.Data;
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<Product> Products => Set<Product>();
+
     public DbSet<Category> Categories => Set<Category>();
+
     public DbSet<Brand> Brands => Set<Brand>();
+
     public DbSet<Profile> Profiles => Set<Profile>();
+
     public DbSet<Concern> Concerns => Set<Concern>();
+
     public DbSet<Ingredient> Ingredients => Set<Ingredient>();
+
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
+
     public DbSet<ProductEmbedding> ProductEmbeddings => Set<ProductEmbedding>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -43,7 +50,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         });
         modelBuilder.Entity<Category>().ToTable("Categories");
         modelBuilder.Entity<Category>().HasOne(x => x.Parent).WithMany().HasForeignKey(x => x.ParentId)
-
             .OnDelete(DeleteBehavior.NoAction);
         modelBuilder.Entity<Brand>().ToTable("Brands");
         modelBuilder.Entity<Profile>().ToTable("Profiles");
@@ -55,7 +61,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             x.ProfileId
         });
         modelBuilder.Entity<ProductProfile>().HasOne(x => x.Profile).WithMany().HasForeignKey(x => x.ProfileId)
-
             .OnDelete(DeleteBehavior.NoAction);
         modelBuilder.Entity<ProductConcern>().ToTable("ProductConcerns").HasKey(x => new
         {
@@ -63,7 +68,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             x.ConcernId
         });
         modelBuilder.Entity<ProductConcern>().HasOne(x => x.Concern).WithMany().HasForeignKey(x => x.ConcernId)
-
             .OnDelete(DeleteBehavior.NoAction);
         modelBuilder.Entity<ProductIngredient>().ToTable("ProductIngredients").HasKey(x => new
         {
@@ -71,7 +75,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             x.IngredientId
         });
         modelBuilder.Entity<ProductIngredient>().HasOne(x => x.Ingredient).WithMany().HasForeignKey(x => x.IngredientId)
-
             .OnDelete(DeleteBehavior.NoAction);
         modelBuilder.Entity<ProductVariant>(entity =>
         {

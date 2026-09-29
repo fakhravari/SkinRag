@@ -41,39 +41,26 @@ internal static class LiveChecks
             return result;
         }
 
-        var greeting = await Ask(new
-        {
-            question = "سلام رفیق خوبی؟"
-        });
+        var greeting = await Ask(new { question = "سلام رفیق خوبی؟" });
         Check(
-                        greeting.GetProperty("intent").GetString() == "GREETING"
-
-                && greeting.GetProperty("retrievalMethod").GetString() == "none",
-                        "Greeting did not bypass retrieval");
-        var joke = await Ask(new
-        {
-            message = "یه جوک درباره کرم بگو 😂"
-        });
+            greeting.GetProperty("intent").GetString() == "GREETING"
+            && greeting.GetProperty("retrievalMethod").GetString() == "none",
+            "Greeting did not bypass retrieval");
+        var joke = await Ask(new { message = "یه جوک درباره کرم بگو 😂" });
         Check(
-                        joke.GetProperty("intent").GetString() == "OFF_TOPIC"
-
-                && joke.GetProperty("products").GetArrayLength() == 0,
-                        "Joke was treated as product search");
-        using (var invalid = await http.PostAsJsonAsync("/api/consultation/ask", new
-        {
-            question = new string('ه', 30)
-        }))
+            joke.GetProperty("intent").GetString() == "OFF_TOPIC"
+            && joke.GetProperty("products").GetArrayLength() == 0,
+            "Joke was treated as product search");
+        using (var invalid = await http.PostAsJsonAsync("/api/consultation/ask", new { question = new string('ه', 30) }))
         {
             Check(invalid.StatusCode == HttpStatusCode.BadRequest, "Spam was accepted");
         }
 
-        using (var invalid = await http.PostAsJsonAsync(
-"/api/consultation/ask",
-new
-{
-    question = "کرم",
-    message = "شامپو"
-}))
+        using (var invalid = await http.PostAsJsonAsync("/api/consultation/ask", new
+        {
+            question = "کرم",
+            message = "شامپو"
+        }))
         {
             Check(invalid.StatusCode == HttpStatusCode.BadRequest, "Contradictory request aliases were accepted");
         }
@@ -81,13 +68,13 @@ new
         var taxonomy = await Get("/api/catalog/filters");
         Check(taxonomy.GetProperty("categories").GetArrayLength() == 48, "Categories changed");
         Check(
-                        taxonomy.GetProperty("brands").EnumerateArray().All(b => !b.GetProperty("name").GetString()!.Contains("آزمایشی")),
-                        "Test brand wording returned");
+            taxonomy.GetProperty("brands").EnumerateArray().All(b => !b.GetProperty("name").GetString()!.Contains("آزمایشی")),
+            "Test brand wording returned");
         var hair = await Get("/api/catalog/products?domain=hair&hairType=hair-curly&maxPrice=1500000&pageSize=100");
         Check(hair.GetProperty("total").GetInt32() > 0, "Hair filter returned no data");
         Check(
-                        hair.GetProperty("items").EnumerateArray().All(p => p.GetProperty("variants").EnumerateArray().All(v => v.GetProperty("stockQuantity").GetInt32() > 0 && v.GetProperty("price").GetDecimal() <= 1500000)),
-                        "Budget/stock did not match the same variant");
+            hair.GetProperty("items").EnumerateArray().All(p => p.GetProperty("variants").EnumerateArray().All(v => v.GetProperty("stockQuantity").GetInt32() > 0 && v.GetProperty("price").GetDecimal() <= 1500000)),
+            "Budget/stock did not match the same variant");
         var unavailable = await Get("/api/catalog/products?search=DEMO-SKIN-01-05&maxPrice=700000");
         Check(unavailable.GetProperty("total").GetInt32() == 0, "Sold-out cheaper variant was eligible");
         using (var invalid = await http.GetAsync("/api/catalog/products?skinType=unknown"))
@@ -119,37 +106,34 @@ new
             maxPrice = 2000000
         });
         Check(
-                        skin.GetProperty("intent").GetString() is "PRODUCT_SEARCH" or "SKIN_CONSULTATION",
-                        "Skin request misclassified");
+            skin.GetProperty("intent").GetString() is "PRODUCT_SEARCH" or "SKIN_CONSULTATION",
+            "Skin request misclassified");
         Check(skin.GetProperty("products").GetArrayLength() > 0, "Skin search returned no products");
         Check(
-                        skin.GetProperty("products").EnumerateArray().All(m =>
-        {
-            var p = m.GetProperty("product");
-            return p.GetProperty("domain").GetString() == "skin" && p.GetProperty("stockQuantity").GetInt32() > 0
-
-                && p.GetProperty("price").GetDecimal() <= 2000000;
-        }),
-                        "Recommended product violated stock, domain or budget");
+            skin.GetProperty("products").EnumerateArray().All(m =>
+            {
+                var p = m.GetProperty("product");
+                return p.GetProperty("domain").GetString() == "skin" && p.GetProperty("stockQuantity").GetInt32() > 0
+                    && p.GetProperty("price").GetDecimal() <= 2000000;
+            }),
+            "Recommended product violated stock, domain or budget");
         var recommended = skin.GetProperty("products").EnumerateArray().Select(x => x.GetProperty("product").GetProperty("id").GetInt32())
-
             .ToHashSet();
         Check(
-                        skin.GetProperty("recommendations").EnumerateArray().All(r => recommended.Contains(r.GetProperty("productId").GetInt32())),
-                        "Recommendation not in validated products");
+            skin.GetProperty("recommendations").EnumerateArray().All(r => recommended.Contains(r.GetProperty("productId").GetInt32())),
+            "Recommendation not in validated products");
         var price = await Ask(new
         {
             question = "قیمتش چنده؟",
             conversationId = skin.GetProperty("conversationId").GetGuid()
         });
         Check(
-                        price.GetProperty("intent").GetString() == "PRICE_INQUIRY"
-
-                && price.GetProperty("retrievalMethod").GetString() == "sql-product-reference",
-                        "Price follow-up lost product reference");
+            price.GetProperty("intent").GetString() == "PRICE_INQUIRY"
+            && price.GetProperty("retrievalMethod").GetString() == "sql-product-reference",
+            "Price follow-up lost product reference");
         Check(
-                        price.GetProperty("products").EnumerateArray().All(m => recommended.Contains(m.GetProperty("product").GetProperty("id").GetInt32())),
-                        "Price follow-up switched products");
+            price.GetProperty("products").EnumerateArray().All(m => recommended.Contains(m.GetProperty("product").GetProperty("id").GetInt32())),
+            "Price follow-up switched products");
         var hairReply = await Ask(new
         {
             question = "برای موی فر و وز، کرم مو بدون آبکشی میخوام",
@@ -159,20 +143,16 @@ new
         });
         Check(hairReply.GetProperty("products").GetArrayLength() > 0, "Hair consultation returned no products");
         Check(
-                        hairReply.GetProperty("products").EnumerateArray().All(m => m.GetProperty("product").GetProperty("categorySlug").GetString() == "leave-in"),
-                        "Model changed explicit category");
-        var details = await Ask(new
-        {
-            question = "ترکیبات محصول #1 چیه؟"
-        });
+            hairReply.GetProperty("products").EnumerateArray().All(m => m.GetProperty("product").GetProperty("categorySlug").GetString() == "leave-in"),
+            "Model changed explicit category");
+        var details = await Ask(new { question = "ترکیبات محصول #1 چیه؟" });
         Check(
-                        details.GetProperty("intent").GetString() == "PRODUCT_DETAILS"
-
-                && details.GetProperty("products")[0].GetProperty("product").GetProperty("id").GetInt32() == 1,
-                        "Explicit details lookup failed");
+            details.GetProperty("intent").GetString() == "PRODUCT_DETAILS"
+            && details.GetProperty("products")[0].GetProperty("product").GetProperty("id").GetInt32() == 1,
+            "Explicit details lookup failed");
         Check(
-                        details.GetProperty("retrievalMethod").GetString() == "sql-product-reference",
-                        "Explicit ID unnecessarily used vectors");
+            details.GetProperty("retrievalMethod").GetString() == "sql-product-reference",
+            "Explicit ID unnecessarily used vectors");
         Console.WriteLine($"{checks} live checks passed against SQL Server and Ollama.");
     }
 }

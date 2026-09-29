@@ -1,5 +1,5 @@
-using SkinRag.Api.Application.Abstractions;
 using Microsoft.EntityFrameworkCore;
+using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Retrieval;
 using SkinRag.Api.Data;
 using SkinRag.Api.Models;
@@ -13,11 +13,11 @@ public sealed class ProductRepository(IDbContextFactory<AppDbContext> factory) :
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         return new(
-                        await db.Categories.AsNoTracking().ToArrayAsync(ct),
-                        await db.Brands.AsNoTracking().ToArrayAsync(ct),
-                        await db.Profiles.AsNoTracking().ToArrayAsync(ct),
-                        await db.Concerns.AsNoTracking().ToArrayAsync(ct),
-                        await db.Ingredients.AsNoTracking().ToArrayAsync(ct));
+            await db.Categories.AsNoTracking().ToArrayAsync(ct),
+            await db.Brands.AsNoTracking().ToArrayAsync(ct),
+            await db.Profiles.AsNoTracking().ToArrayAsync(ct),
+            await db.Concerns.AsNoTracking().ToArrayAsync(ct),
+            await db.Ingredients.AsNoTracking().ToArrayAsync(ct));
     }
 
     private static IQueryable<Product> Query(AppDbContext db, SearchPlan plan)

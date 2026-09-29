@@ -8,13 +8,13 @@ public static class PipelinePrompts
     public static JsonElement Schema(object value) => JsonSerializer.SerializeToElement(value);
     public static object NullableEnum(IEnumerable<string> values) => new Dictionary<string, object?>
     {
-        ["type"] = new[]
-        {
+        ["type"] = new[] {
             "string",
             "null"
         },
         ["enum"] = values.Cast<object?>().Append(null).ToArray()
     };
+
     public static readonly JsonElement IntentSchema = Schema(new
     {
         type = "object",

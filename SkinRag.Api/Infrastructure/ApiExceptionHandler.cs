@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
-using SkinRag.Api.Services;
 using SkinRag.Api.Application.Validation;
+using SkinRag.Api.Services;
 
 namespace SkinRag.Api.Infrastructure;
 
@@ -25,10 +25,10 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
             _ => (500, "خطای داخلی رخ داد؛ گزارش سرور را بررسی کنید.")
         };
         logger.LogError(
-                        exception,
-                        "API request failed with status {Status}; trace {Trace}",
-                        status,
-                        context.TraceIdentifier);
+            exception,
+            "API request failed with status {Status}; trace {Trace}",
+            status,
+            context.TraceIdentifier);
         context.Response.StatusCode = status;
         if (status == 503)
         {
@@ -36,18 +36,18 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
         }
 
         await context.Response.WriteAsJsonAsync(
-                        new ProblemDetails
-                        {
-                            Status = status,
-                            Title = title,
-                            Instance = context.Request.Path,
-                            Extensions =
-                            {
-                                ["traceId"] = context.TraceIdentifier,
-                                ["code"] = exception is InputRejectedException input ? input.Code : null
-                            }
-                        },
-                        cancellationToken: ct);
+            new ProblemDetails
+            {
+                Status = status,
+                Title = title,
+                Instance = context.Request.Path,
+                Extensions =
+                {
+                    ["traceId"] = context.TraceIdentifier,
+                    ["code"] = exception is InputRejectedException input ? input.Code : null
+                }
+            },
+            cancellationToken: ct);
         return true;
     }
 }

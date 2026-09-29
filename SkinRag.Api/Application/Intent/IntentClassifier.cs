@@ -1,8 +1,8 @@
-using SkinRag.Api.Infrastructure;
-using SkinRag.Api.Application.Abstractions;
-using SkinRag.Api.Services;
-using SkinRag.Api.Prompts;
 using System.Text.RegularExpressions;
+using SkinRag.Api.Application.Abstractions;
+using SkinRag.Api.Infrastructure;
+using SkinRag.Api.Prompts;
+using SkinRag.Api.Services;
 
 namespace SkinRag.Api.Application.Intent;
 
@@ -14,13 +14,13 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
     private static partial Regex DetailsReference();
     [GeneratedRegex(@"^(?:محصول )?[0-9]+ (?:موجوده|موجود است|موجود هست)$")]
     private static partial Regex AvailabilityReference();
+
     public async Task<IntentDecision> ClassifyAsync(string message, IReadOnlyList<string> previousQuestions, CancellationToken ct)
     {
         if (ConversationReplies.GetReply(message) is not null)
         {
             return new(ConsultationIntent.Greeting, 1, "rules");
         }
-
         // Obvious unrelated requests stop before any model, SQL or embeddings.
         var normalized = PersianText.Normalize(message);
         if (Has(normalized, "جوک", "لطیفه", "joke", "سیاست", "فوتبال", "برنامه نویسی"))
@@ -58,18 +58,18 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
         try
         {
             var output = await ollama.ChatStructuredAsync<IntentModelOutput>(
-                                PipelinePrompts.Intent,
-                                new
-                                {
-                                    message,
-                                    previousUserQuestions = previousQuestions.TakeLast(2)
-                                },
-                                PipelinePrompts.IntentSchema,
-                                new(
-                        "Intent",
-                        configuration.GetValue("Consultation:IntentTimeoutSeconds", 70),
-                        configuration.GetValue("Consultation:IntentMaxTokens", 64)),
-                                ct);
+                PipelinePrompts.Intent,
+                new
+                {
+                    message,
+                    previousUserQuestions = previousQuestions.TakeLast(2)
+                },
+                PipelinePrompts.IntentSchema,
+                new(
+                "Intent",
+                configuration.GetValue("Consultation:IntentTimeoutSeconds", 70),
+                configuration.GetValue("Consultation:IntentMaxTokens", 64)),
+                ct);
             if (!TryValidate(output, configuration.GetValue("Consultation:MinimumIntentConfidence", .65), out var decision))
             {
                 return new(ConsultationIntent.Unclear, 0, "invalid-model-output");
@@ -83,7 +83,6 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
             return decision;
         }
         catch (Exception ex) when (!ct.IsCancellationRequested
-
             && ex is (OperationCanceledException or HttpRequestException or InvalidModelOutputException))
         {
             logger.LogWarning("Intent classifier unavailable ({ErrorType}); using conservative routing", ex.GetType().Name);
@@ -96,11 +95,8 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
     {
         decision = new(ConsultationIntent.Unclear, 0, "invalid-model-output");
         if (output.Intent is null || !IntentCodes.TryParse(output.Intent, out var intent)
-
             || !double.IsFinite(output.Confidence)
-
             || output.Confidence < 0
-
             || output.Confidence > 1)
         {
             return false;

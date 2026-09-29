@@ -10,6 +10,7 @@ public static partial class InputNormalizer
     private static partial Regex Spaces();
     [GeneratedRegex(@"([!?؟])\1+")]
     private static partial Regex RepeatedPunctuation();
+
     // Preserve punctuation, wording and case; search token normalization is a separate operation.
     public static string Normalize(string? input)
     {

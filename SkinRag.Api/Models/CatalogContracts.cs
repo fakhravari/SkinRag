@@ -52,7 +52,6 @@ public class CatalogFilters : IValidatableObject
         }
 
         if (ExcludeIngredientSlugs is null
-
             || ExcludeIngredientSlugs.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 80))
         {
             yield return new ValidationResult("ترکیبات مستثنا باید با slug معتبر ارسال شوند.", [nameof(ExcludeIngredientSlugs)]);
@@ -74,56 +73,61 @@ public sealed class CatalogSearchRequest : CatalogFilters
 }
 
 public sealed record VariantDto(
-        int Id,
-        string Sku,
-        string Name,
-        decimal SizeValue,
-        string SizeUnit,
-        string? Shade,
-        string? Finish,
-        decimal Price,
-        int StockQuantity);
+    int Id,
+    string Sku,
+    string Name,
+    decimal SizeValue,
+    string SizeUnit,
+    string? Shade,
+    string? Finish,
+    decimal Price,
+    int StockQuantity);
+
 public sealed record ProductDto(
-        int Id,
-        string? Sku,
-        string Name,
-        string? Brand,
-        string? BrandSlug,
-        string? Category,
-        string? CategorySlug,
-        string? Domain,
-        decimal? Price,
-        string Currency,
-        int StockQuantity,
-        bool IsDemo,
-        bool? FragranceFree,
-        string? SkinTypes,
-        string? HairTypes,
-        string? Description,
-        string? Warnings,
-        string? UsageInstructions,
-        string[] Profiles,
-        string[] Concerns,
-        string[] Ingredients,
-        IReadOnlyList<VariantDto> Variants,
-        string? IngredientsText = null,
-        string? ConcernsText = null);
+    int Id,
+    string? Sku,
+    string Name,
+    string? Brand,
+    string? BrandSlug,
+    string? Category,
+    string? CategorySlug,
+    string? Domain,
+    decimal? Price,
+    string Currency,
+    int StockQuantity,
+    bool IsDemo,
+    bool? FragranceFree,
+    string? SkinTypes,
+    string? HairTypes,
+    string? Description,
+    string? Warnings,
+    string? UsageInstructions,
+    string[] Profiles,
+    string[] Concerns,
+    string[] Ingredients,
+    IReadOnlyList<VariantDto> Variants,
+    string? IngredientsText = null,
+    string? ConcernsText = null);
+
 public sealed record ProductMatch(ProductDto Product, double Similarity, double Score, string? Reason = null);
+
 public sealed record ProductRecommendation(int ProductId, string Reason);
+
 public sealed record ConsultationResponse(
-        string Answer,
-        IReadOnlyList<ProductMatch> Products,
-        string Currency,
-        string RetrievalMethod,
-        int EligibleProducts,
-        DateTime? IndexUpdatedAtUtc,
-        bool IsDemo,
-        string ResponseMode = "model",
-        string? Notice = null,
-        string Intent = "PRODUCT_SEARCH",
-        double IntentConfidence = 1,
-        Guid? ConversationId = null,
-        bool NeedsMoreInformation = false,
-        string? FollowUpQuestion = null,
-        IReadOnlyList<ProductRecommendation>? Recommendations = null);
+    string Answer,
+    IReadOnlyList<ProductMatch> Products,
+    string Currency,
+    string RetrievalMethod,
+    int EligibleProducts,
+    DateTime? IndexUpdatedAtUtc,
+    bool IsDemo,
+    string ResponseMode = "model",
+    string? Notice = null,
+    string Intent = "PRODUCT_SEARCH",
+    double IntentConfidence = 1,
+    Guid? ConversationId = null,
+    bool NeedsMoreInformation = false,
+    string? FollowUpQuestion = null,
+    IReadOnlyList<ProductRecommendation>? Recommendations = null);
+
 public sealed record CatalogPage(int Page, int PageSize, int Total, IReadOnlyList<ProductDto> Items);

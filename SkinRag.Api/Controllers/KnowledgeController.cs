@@ -1,8 +1,8 @@
-using Microsoft.AspNetCore.Mvc;
-using SkinRag.Api.Services;
-using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using SkinRag.Api.Services;
 
 namespace SkinRag.Api.Controllers;
 
@@ -24,15 +24,14 @@ public sealed class KnowledgeController(KnowledgeIndexService indexService, ICon
 
             var origin = Request.Headers.Origin.ToString();
             if (Request.Headers["X-Requested-With"] != "XMLHttpRequest" || !Request.HasJsonContentType()
-
                 || (origin.Length > 0 && origin != $"{Request.Scheme}://{Request.Host}"))
             {
                 return Unauthorized();
             }
         }
         else if (!CryptographicOperations.FixedTimeEquals(
-                        SHA256.HashData(Encoding.UTF8.GetBytes(expected)),
-                        SHA256.HashData(Encoding.UTF8.GetBytes(Request.Headers["X-Admin-Key"].ToString()))))
+            SHA256.HashData(Encoding.UTF8.GetBytes(expected)),
+            SHA256.HashData(Encoding.UTF8.GetBytes(Request.Headers["X-Admin-Key"].ToString()))))
         {
             return Unauthorized();
         }
@@ -60,8 +59,9 @@ public sealed class KnowledgeController(KnowledgeIndexService indexService, ICon
             return "api-key";
         }
 
-        return environment.IsDevelopment() && HttpContext.Connection.RemoteIpAddress is { } ip
-
+        return environment.IsDevelopment() && HttpContext.Connection.RemoteIpAddress is
+        {
+        } ip
             && System.Net.IPAddress.IsLoopback(ip) ? "local-development" : "disabled";
     }
 }

@@ -1,16 +1,15 @@
-using SkinRag.Api.Infrastructure;
 using SkinRag.Api.Application.Abstractions;
-using SkinRag.Api.Infrastructure.Persistence;
+using SkinRag.Api.Infrastructure;
 using SkinRag.Api.Models;
 using SkinRag.Api.Services;
 
 namespace SkinRag.Api.Application.Retrieval;
 
 public sealed class ProductRetriever(
-        IProductRepository repository,
-        KnowledgeIndexService index,
-        IOllamaClient ollama,
-        IConfiguration configuration) : IProductRetriever
+    IProductRepository repository,
+    KnowledgeIndexService index,
+    IOllamaClient ollama,
+    IConfiguration configuration) : IProductRetriever
 {
     public async Task<RetrievalResult> RetrieveAsync(SearchPlan plan, CancellationToken ct)
     {
@@ -24,12 +23,11 @@ public sealed class ProductRetriever(
         {
             var direct = await repository.LoadAsync(eligible, plan, ct);
             return new(
-                                direct.OrderBy(p => Array.IndexOf(plan.ProductIds, p.Id)).Select(p => new ProductMatch(p, 1, 1))
-
-                    .ToArray(),
-                                eligible.Length,
-                                null,
-                                "sql-product-reference");
+                direct.OrderBy(p => Array.IndexOf(plan.ProductIds, p.Id)).Select(p => new ProductMatch(p, 1, 1))
+                .ToArray(),
+                eligible.Length,
+                null,
+                "sql-product-reference");
         }
 
         var snapshot = index.Snapshot();
@@ -60,22 +58,16 @@ public sealed class ProductRetriever(
             Document = d,
             Similarity = Cosine(vector, d.Embedding, norm, d.VectorNorm)
         })
-
             .Where(x => x.Similarity >= minimum)
-
             .Select(x => new
             {
                 Id = x.Document.ProductId,
                 x.Similarity,
                 Score = .8 * x.Similarity + .2 * (tokens.Count == 0 ? 0 : (double)tokens.Count(x.Document.Tokens.Contains) / tokens.Count)
             })
-
             .OrderByDescending(x => x.Score)
-
             .ThenBy(x => x.Id)
-
             .Take(plan.PreferBudget ? topK * 4 : topK)
-
             .ToArray();
         // Prices/stock are re-read from SQL, even when a cached embedding was used.
         var live = (await repository.LoadAsync(ranked.Select(x => x.Id), plan, ct)).ToDictionary(x => x.Id);

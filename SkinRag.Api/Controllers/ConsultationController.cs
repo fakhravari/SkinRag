@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using SkinRag.Api.Models;
-using SkinRag.Api.Application.Consultation;
 using Microsoft.AspNetCore.RateLimiting;
+using SkinRag.Api.Application.Consultation;
+using SkinRag.Api.Models;
 
 namespace SkinRag.Api.Controllers;
 

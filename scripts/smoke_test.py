@@ -22,7 +22,9 @@ def call(path, query=None, body=None):
     if query:
         url += "?" + urllib.parse.urlencode(query, doseq=True)
     payload = None if body is None else json.dumps(body, ensure_ascii=False).encode("utf-8")
-    request = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+    request = urllib.request.Request(url,
+        data=payload,
+        headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(request, timeout=360) as response:
             data = response.read().decode("utf-8")
@@ -81,7 +83,10 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(0, self.page(search="DEMO-SKIN-04-05", inStockOnly="false")["total"])
 
     def test_fragrance_and_ingredient_exclusion(self):
-        data = self.page(domain="skin", fragranceFree="true", excludeIngredientSlugs=["shea", "fragrance"], pageSize=100)
+        data = self.page(domain="skin",
+            fragranceFree="true",
+            excludeIngredientSlugs=["shea", "fragrance"],
+            pageSize=100)
         self.assertGreater(data["total"], 0)
         for item in data["items"]:
             self.assertTrue(item["fragranceFree"])
@@ -102,7 +107,10 @@ class CatalogTests(unittest.TestCase):
             self.assertTrue(all(v["sizeValue"] == 100 and v["sizeUnit"] == "ml" for v in item["variants"]))
 
     def test_category_root_brand_and_concern(self):
-        data = self.page(categorySlug="hair", brandSlug="ldora-care", concernSlug="frizz", pageSize=100)
+        data = self.page(categorySlug="hair",
+            brandSlug="ldora-care",
+            concernSlug="frizz",
+            pageSize=100)
         self.assertGreater(data["total"], 0)
         self.assertTrue(all(x["domain"] == "hair" and x["brandSlug"] == "ldora-care" and "frizz" in x["concerns"] for x in data["items"]))
 
@@ -134,7 +142,8 @@ class CatalogTests(unittest.TestCase):
                 self.assertEqual(200, response.status)
                 self.assertEqual("text/html", response.headers.get_content_type())
                 self.assertIn('dir="rtl"', response.read().decode("utf-8"))
-        with urllib.request.urlopen(args.base_url + "/vendor/jquery-4.0.0.min.js", timeout=20) as response:
+        with urllib.request.urlopen(args.base_url + "/vendor/jquery-4.0.0.min.js",
+            timeout=20) as response:
             self.assertIn(b"jQuery v4.0.0", response.read(150))
 
     def test_greeting_is_fast_without_filters(self):
@@ -153,7 +162,8 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual("hybrid-vector-lexical", data["retrievalMethod"])
 
     def test_local_font_and_razor_assets(self):
-        with urllib.request.urlopen(args.base_url + "/fonts/Vazirmatn-Variable.woff2", timeout=20) as response:
+        with urllib.request.urlopen(args.base_url + "/fonts/Vazirmatn-Variable.woff2",
+            timeout=20) as response:
             self.assertEqual(b"wOF2", response.read(4))
         with urllib.request.urlopen(args.base_url + "/chat", timeout=20) as response:
             page = response.read().decode("utf-8")
@@ -186,7 +196,10 @@ class ConsultationTests(unittest.TestCase):
         return data
 
     def test_skin_low_budget_retrieves_affordable_candidate(self):
-        data = self.ask(question="برای پوست خشک یک کرم مرطوب‌کننده ارزان می‌خواهم", domain="skin", skinType="skin-dry", maxPrice=200000)
+        data = self.ask(question="برای پوست خشک یک کرم مرطوب‌کننده ارزان می‌خواهم",
+            domain="skin",
+            skinType="skin-dry",
+            maxPrice=200000)
         self.assertGreater(len(data["products"]), 0, data["answer"])
         for match in data["products"]:
             self.assertLessEqual(match["product"]["price"], 200000)
@@ -196,7 +209,9 @@ class ConsultationTests(unittest.TestCase):
         self.assertIn("[", data["answer"])
 
     def test_hair_consultation(self):
-        data = self.ask(question="برای موی فر و وز یک کرم مو بدون آبکشی می‌خواهم", domain="hair", hairType="hair-curly",
+        data = self.ask(question="برای موی فر و وز یک کرم مو بدون آبکشی می‌خواهم",
+            domain="hair",
+            hairType="hair-curly",
                         categorySlug="leave-in", excludeIngredientSlugs=["fragrance"], maxPrice=1800000)
         self.assertGreater(len(data["products"]), 0)
         for match in data["products"]:
@@ -204,7 +219,9 @@ class ConsultationTests(unittest.TestCase):
             self.assertNotIn("fragrance", match["product"]["ingredients"])
 
     def test_beauty_consultation_with_shade(self):
-        data = self.ask(question="یک رژ لب صورتی مات می‌خواهم", domain="beauty", categorySlug="lipstick",
+        data = self.ask(question="یک رژ لب صورتی مات می‌خواهم",
+            domain="beauty",
+            categorySlug="lipstick",
                         shade="صورتی", finish="مات", maxPrice=2100000)
         self.assertGreater(len(data["products"]), 0)
         for match in data["products"]:

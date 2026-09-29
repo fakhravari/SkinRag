@@ -1,9 +1,9 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Consultation;
 using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Infrastructure;
-using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Models;
 using SkinRag.Api.Prompts;
 
@@ -19,68 +19,65 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
     private static partial Regex BudgetAmount();
     [GeneratedRegex(@"^[0-9]{1,3}(?:[.,٬][0-9]{3})+$")]
     private static partial Regex GroupedNumber();
+
     public async Task<SearchPlan> BuildAsync(
-                ConsultationRequest request,
-                string message,
-                IntentDecision decision,
-                ConversationState conversation,
-                CatalogVocabulary vocabulary,
-                CancellationToken ct)
+        ConsultationRequest request,
+        string message,
+        IntentDecision decision,
+        ConversationState conversation,
+        CatalogVocabulary vocabulary,
+        CancellationToken ct)
     {
         var ids = ReferencedIds(message);
         var writtenBudget = ParseMaximumPrice(message);
         if (request.MaxPrice is null && writtenBudget is null && BudgetAmount().IsMatch(message))
         {
             return new(
-                                message,
-                                CopyFilters(request),
-                                decision.Intent,
-                                [],
-                                false,
-                                [],
-                                NeedsMoreInformation: true,
-                                FollowUpQuestion: "مبلغ بودجه را با واحد ریال یا تومان می‌فرمایید؟",
-                                Source: "ambiguous-budget");
+                message,
+                CopyFilters(request),
+                decision.Intent,
+                [],
+                false,
+                [],
+                NeedsMoreInformation: true,
+                FollowUpQuestion: "مبلغ بودجه را با واحد ریال یا تومان می‌فرمایید؟",
+                Source: "ambiguous-budget");
         }
 
         var text = PersianText.Normalize(message);
         var isContextual = decision.Intent == ConsultationIntent.FollowUp
-
             || HasAny(
-                            text,
-                            "این",
-                            "اون",
-                            "همین",
-                            "اولی",
-                            "دومی",
-                            "قیمتش",
-                            "ترکیباتش",
-                            "موجوده",
-                            "ارزان ترش",
-                            "ارزون ترش");
+            text,
+            "این",
+            "اون",
+            "همین",
+            "اولی",
+            "دومی",
+            "قیمتش",
+            "ترکیباتش",
+            "موجوده",
+            "ارزان ترش",
+            "ارزون ترش");
         if (ids.Length == 0 && isContextual && conversation.ProductIds.Length > 0
-
             && decision.Intent is ConsultationIntent.ProductDetails or ConsultationIntent.ProductComparison or ConsultationIntent.PriceInquiry or ConsultationIntent.AvailabilityInquiry)
         {
             ids = HasAny(text, "اولی") ? conversation.ProductIds.Take(1).ToArray() : HasAny(text, "دومی") ? conversation.ProductIds.Skip(1).Take(1).ToArray() : conversation.ProductIds;
         }
 
         if (isContextual && ids.Length == 0 && conversation.UserQuestions.Length == 0
-
             && !request.History.Any(x => x.Role == "user")
-
             && !HasAny(text, "پوست", "مو", "شامپو", "کرم", "ضدآفتاب", "رژ", "ریمل"))
         {
             return new(
-                                message,
-                                CopyFilters(request),
-                                decision.Intent,
-                                [],
-                                false,
-                                [],
-                                NeedsMoreInformation: true,
-                                FollowUpQuestion: "نام یا شناسه محصول موردنظر را می‌فرمایید؟",
-                                Source: "missing-context");
+                message,
+                CopyFilters(request),
+                decision.Intent,
+                [],
+                false,
+                [],
+                NeedsMoreInformation: true,
+                FollowUpQuestion: "نام یا شناسه محصول موردنظر را می‌فرمایید؟",
+                Source: "missing-context");
         }
 
         if (ids.Length > 0)
@@ -88,31 +85,30 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             var explicitFilters = CopyFilters(request);
             explicitFilters.MaxPrice ??= writtenBudget;
             return new(
-                                message,
-                                explicitFilters,
-                                decision.Intent,
-                                request.ConcernSlug is null ? [] : [request.ConcernSlug],
-                                false,
-                                ids,
-                                InStockOnly: decision.Intent is not (ConsultationIntent.AvailabilityInquiry or ConsultationIntent.PriceInquiry or ConsultationIntent.ProductDetails or ConsultationIntent.ProductComparison),
-                                Source: "product-reference");
+                message,
+                explicitFilters,
+                decision.Intent,
+                request.ConcernSlug is null ? [] : [request.ConcernSlug],
+                false,
+                ids,
+                InStockOnly: decision.Intent is not (ConsultationIntent.AvailabilityInquiry or ConsultationIntent.PriceInquiry or ConsultationIntent.ProductDetails or ConsultationIntent.ProductComparison),
+                Source: "product-reference");
         }
 
         var previous = isContextual ? conversation.SearchQuery ?? conversation.UserQuestions.LastOrDefault() ?? request.History.LastOrDefault(x => x.Role == "user")?.Content : null;
         if (request.CategorySlug is not null
-
             && (request.SkinType is not null || request.HairType is not null || request.Domain == "beauty"))
         {
             var explicitFilters = CopyFilters(request);
             explicitFilters.MaxPrice ??= writtenBudget;
             return new(
-                                message,
-                                explicitFilters,
-                                decision.Intent,
-                                request.ConcernSlug is null ? [] : [request.ConcernSlug],
-                                HasAny(text, "ارزان", "ارزون", "اقتصادی"),
-                                [],
-                                Source: "explicit-filters");
+                message,
+                explicitFilters,
+                decision.Intent,
+                request.ConcernSlug is null ? [] : [request.ConcernSlug],
+                HasAny(text, "ارزان", "ارزون", "اقتصادی"),
+                [],
+                Source: "explicit-filters");
         }
 
         QueryModelOutput parsed;
@@ -122,17 +118,15 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             parsed = await ExtractModelQueryAsync(request, message, previous, decision, vocabulary, ct);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested
-
             && ex is (OperationCanceledException or HttpRequestException or InvalidModelOutputException))
         {
             logger.LogWarning(
-                                "Query extraction unavailable ({ErrorType}); using explicit filters and customer wording",
-                                ex.GetType().Name);
+                "Query extraction unavailable ({ErrorType}); using explicit filters and customer wording",
+                ex.GetType().Name);
             source = "explicit-filters";
             var fallbackText = previous is null ? message : previous + " " + message;
             var domain = request.Domain ?? ScopeDomain(fallbackText);
             var profileMatches = vocabulary.Profiles.Where(x => (domain is null || x.Kind == domain) && LabelScore(PersianText.Normalize(fallbackText), x.Name) > 0)
-
                 .ToArray();
             parsed = new()
             {
@@ -150,65 +144,52 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             throw new ArgumentException("بودجه نوشته‌شده از حداقل قیمت انتخاب‌شده کمتر است.");
         }
 
-        var concerns = request.ConcernSlug is not null ? new[]
-        {
+        var concerns = request.ConcernSlug is not null ? new[] {
             request.ConcernSlug
         } : parsed.ConcernSlugs;
         concerns = concerns.Where(s => vocabulary.Concerns.Any(c => c.Slug == s && (filters.Domain is null || c.Domain == filters.Domain)))
-
             .Distinct()
-
             .ToArray();
         // Relative requests seek alternatives, rather than being pinned to the earlier product IDs.
         var budget = parsed.PricePreference == "budget"
-
             || HasAny(text, "ارزان", "ارزون", "اقتصادی", "ارزان ترش", "ارزون ترش");
         return new(
-                        parsed.Query,
-                        filters,
-                        decision.Intent,
-                        concerns,
-                        budget,
-                        ids,
-                        InStockOnly: decision.Intent is not (ConsultationIntent.AvailabilityInquiry or ConsultationIntent.PriceInquiry or ConsultationIntent.ProductDetails or ConsultationIntent.ProductComparison),
-                        Source: source);
+            parsed.Query,
+            filters,
+            decision.Intent,
+            concerns,
+            budget,
+            ids,
+            InStockOnly: decision.Intent is not (ConsultationIntent.AvailabilityInquiry or ConsultationIntent.PriceInquiry or ConsultationIntent.ProductDetails or ConsultationIntent.ProductComparison),
+            Source: source);
     }
 
     public static bool IsValid(QueryModelOutput value, CatalogVocabulary vocabulary)
     {
         if (string.IsNullOrWhiteSpace(value.Query) || value.Query.Length > 500
-
             || value.PricePreference is not ("budget" or "neutral")
-
             || value.ConcernSlugs is null
-
             || value.ConcernSlugs.Length > 3
-
             || value.ExcludeIngredientSlugs is null
-
             || value.ExcludeIngredientSlugs.Length > 20
-
             || value.Domain is not (null or "skin" or "hair" or "beauty"))
         {
             return false;
         }
 
         if (value.SkinType is not null
-
             && !vocabulary.Profiles.Any(x => x.Kind == "skin" && x.Slug == value.SkinType))
         {
             return false;
         }
 
         if (value.HairType is not null
-
             && !vocabulary.Profiles.Any(x => x.Kind == "hair" && x.Slug == value.HairType))
         {
             return false;
         }
 
         if (value.CategorySlug is not null
-
             && !vocabulary.Categories.Any(x => x.Slug == value.CategorySlug && (value.Domain is null || x.Domain == value.Domain)))
         {
             return false;
@@ -220,19 +201,15 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         }
 
         return value.ConcernSlugs.All(s => vocabulary.Concerns.Any(x => x.Slug == s))
-
             && value.ExcludeIngredientSlugs.All(s => vocabulary.Ingredients.Any(x => x.Slug == s));
     }
 
     public static int[] ReferencedIds(string message) => ProductReferences().Matches(message).Select(x => int.TryParse(x.Groups[1].Value, out var id) ? id : 0)
-
         .Where(x => x > 0)
-
         .Distinct()
-
         .Take(10)
-
         .ToArray();
+
     public static decimal? ParseMaximumPrice(string text)
     {
         var match = MaximumPrice().Match(text);
@@ -290,14 +267,13 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         ExcludeIngredientSlugs = f.ExcludeIngredientSlugs.ToArray()
     };
     private static bool HasAny(string text, params string[] values) => values.Any(s => (" " + text + " ").Contains(" " + s + " ", StringComparison.Ordinal));
+
     private static int LabelScore(string text, string label)
     {
         var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         string[] suffixes = ["", "ه", "م", "ها", "های", "ی", "تر", "تری"];
         return PersianText.SearchTokens(label).Where(t => t.Length >= 2
-
             && t is not ("پوست" or "صورت" or "مو" or "موی" or "مراقبت" or "کننده" or "انواع" or "همه"))
-
             .Count(t => words.Any(word => suffixes.Any(s => word == t + s)));
     }
 
@@ -307,16 +283,16 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         var hair = HasAny(text, "مو", "موی", "موهام", "موها", "شامپو", "نرم کننده", "کراتین");
         var beauty = HasAny(text, "رژ", "ریمل", "کانسیلر", "سایه", "خط چشم", "کرم پودر", "لاک", "رژگونه");
         var skin = HasAny(
-                        text,
-                        "پوست",
-                        "پوستم",
-                        "ضدآفتاب",
-                        "ضد آفتاب",
-                        "آبرسان",
-                        "مرطوب کننده",
-                        "شوینده",
-                        "صورت",
-                        "شامپو بدن");
+            text,
+            "پوست",
+            "پوستم",
+            "ضدآفتاب",
+            "ضد آفتاب",
+            "آبرسان",
+            "مرطوب کننده",
+            "شوینده",
+            "صورت",
+            "شامپو بدن");
         if (text.Contains("شامپو بدن"))
         {
             hair = false;
@@ -347,12 +323,12 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
     }
 
     private async Task<QueryModelOutput> ExtractModelQueryAsync(
-                ConsultationRequest request,
-                string message,
-                string? previous,
-                IntentDecision decision,
-                CatalogVocabulary vocabulary,
-                CancellationToken ct)
+        ConsultationRequest request,
+        string message,
+        string? previous,
+        IntentDecision decision,
+        CatalogVocabulary vocabulary,
+        CancellationToken ct)
     {
         // Keep extraction context small enough for the configured local model window.
         // This narrows the vocabulary only; an inferred scope is not a hard SQL filter.
@@ -365,38 +341,24 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
                 Value = x,
                 Score = LabelScore(searchText, x.Name)
             })
-
-                .Where(x => x.Score > 0)
-
-                .OrderByDescending(x => x.Score)
-
-                .Take(4)
-
-                .Select(x => x.Value)
-
-                .ToArray(),
+            .Where(x => x.Score > 0)
+            .OrderByDescending(x => x.Score)
+            .Take(4)
+            .Select(x => x.Value)
+            .ToArray(),
             Concerns = vocabulary.Concerns.Where(x => scope is null || x.Domain == scope).Where(x => LabelScore(searchText, x.Name + " " + x.SearchTerms) > 0)
-
-                .Take(3)
-
-                .ToArray(),
+            .Take(3)
+            .ToArray(),
             Profiles = vocabulary.Profiles.Where(x => (scope is null || x.Kind == scope) && LabelScore(searchText, x.Name) > 0)
-
-                .Take(4)
-
-                .ToArray(),
+            .Take(4)
+            .ToArray(),
             Brands = vocabulary.Brands.Where(x => searchText.Contains(PersianText.Normalize(x.Name), StringComparison.Ordinal)
-
-    || (x.Slug.StartsWith("ldora", StringComparison.Ordinal) && searchText.Contains("لدورا")))
-
-                .ToArray(),
+|| (x.Slug.StartsWith("ldora", StringComparison.Ordinal) && searchText.Contains("لدورا")))
+            .ToArray(),
             Ingredients = vocabulary.Ingredients.Where(x => request.ExcludeIngredientSlugs.Contains(x.Slug)
-
-    || PersianText.Normalize(message).Contains(PersianText.Normalize(x.Name), StringComparison.Ordinal)
-
-    || message.Contains(x.Slug, StringComparison.OrdinalIgnoreCase))
-
-                .ToArray()
+|| PersianText.Normalize(message).Contains(PersianText.Normalize(x.Name), StringComparison.Ordinal)
+|| message.Contains(x.Slug, StringComparison.OrdinalIgnoreCase))
+            .ToArray()
         };
         object SlugArray(IEnumerable<string> values, int maximum) => new
         {
@@ -428,8 +390,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             ["excludeIngredientSlugs"] = SlugArray(scoped.Ingredients.Select(x => x.Slug), Math.Min(20, scoped.Ingredients.Length)),
             ["fragranceFree"] = new
             {
-                type = new[]
-                {
+                type = new[] {
                     "boolean",
                     "null"
                 }
@@ -437,8 +398,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             ["pricePreference"] = new
             {
                 type = "string",
-                @enum = new[]
-                {
+                @enum = new[] {
                     "budget",
                     "neutral"
                 }
@@ -452,24 +412,24 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             required = properties.Keys.ToArray()
         });
         var parsed = await ollama.ChatStructuredAsync<QueryModelOutput>(
-                        PipelinePrompts.Query,
-                        new
-                        {
-                            message,
-                            intent = decision.Code,
-                            previousUserQuestion = previous,
-                            categories = scoped.Categories.Select(x => new[] { x.Slug, x.Name, x.Domain }),
-                            brands = scoped.Brands.Select(x => new[] { x.Slug, x.Name }),
-                            profiles = scoped.Profiles.Select(x => new[] { x.Slug, x.Name, x.Kind }),
-                            concerns = scoped.Concerns.Select(x => new[] { x.Slug, x.Name }),
-                            ingredients = scoped.Ingredients.Select(x => new[] { x.Slug, x.Name })
-                        },
-                        schema,
-                        new(
-                    "Query",
-                    configuration.GetValue("Consultation:QueryTimeoutSeconds", 60),
-                    configuration.GetValue("Consultation:QueryMaxTokens", 220)),
-                        ct);
+            PipelinePrompts.Query,
+            new
+            {
+                message,
+                intent = decision.Code,
+                previousUserQuestion = previous,
+                categories = scoped.Categories.Select(x => new[] { x.Slug, x.Name, x.Domain }),
+                brands = scoped.Brands.Select(x => new[] { x.Slug, x.Name }),
+                profiles = scoped.Profiles.Select(x => new[] { x.Slug, x.Name, x.Kind }),
+                concerns = scoped.Concerns.Select(x => new[] { x.Slug, x.Name }),
+                ingredients = scoped.Ingredients.Select(x => new[] { x.Slug, x.Name })
+            },
+            schema,
+            new(
+            "Query",
+            configuration.GetValue("Consultation:QueryTimeoutSeconds", 60),
+            configuration.GetValue("Consultation:QueryMaxTokens", 220)),
+            ct);
         if (!IsValid(parsed, scoped))
         {
             throw new InvalidModelOutputException("Query references unknown or contradictory catalog filters.");
@@ -479,18 +439,17 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
     }
 
     private static CatalogFilters MergeFilters(
-                ConsultationRequest request,
-                QueryModelOutput parsed,
-                IntentDecision decision,
-                ConversationState conversation,
-                CatalogVocabulary vocabulary,
-                decimal? writtenBudget)
+        ConsultationRequest request,
+        QueryModelOutput parsed,
+        IntentDecision decision,
+        ConversationState conversation,
+        CatalogVocabulary vocabulary,
+        decimal? writtenBudget)
     {
         var filters = CopyFilters(request);
         filters.Domain ??= parsed.Domain;
         var category = vocabulary.Categories.FirstOrDefault(x => x.Slug == parsed.CategorySlug);
         if (filters.CategorySlug is null && category is not null
-
             && (filters.Domain is null || filters.Domain == category.Domain))
         {
             filters.CategorySlug = category.Slug;
@@ -502,7 +461,9 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         filters.FragranceFree ??= parsed.FragranceFree;
         filters.MaxPrice ??= writtenBudget;
         filters.ExcludeIngredientSlugs = filters.ExcludeIngredientSlugs.Concat(parsed.ExcludeIngredientSlugs).Distinct().ToArray();
-        if (decision.Intent == ConsultationIntent.FollowUp && conversation.SearchFilters is { } earlier)
+        if (decision.Intent == ConsultationIntent.FollowUp && conversation.SearchFilters is
+            {
+            } earlier)
         {
             filters.Domain ??= earlier.Domain;
             filters.CategorySlug ??= earlier.CategorySlug;

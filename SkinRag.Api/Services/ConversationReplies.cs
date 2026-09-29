@@ -1,5 +1,5 @@
-using System.Text.RegularExpressions;
 using System.Collections.Frozen;
+using System.Text.RegularExpressions;
 using SkinRag.Api.Infrastructure;
 
 namespace SkinRag.Api.Services;
@@ -66,8 +66,10 @@ public static partial class ConversationReplies
         ["داداش"] = Intent.None,
         ["سلامت باشی"] = Intent.Thanks
     }.ToFrozenDictionary();
+
     [GeneratedRegex(@"(\p{L})\1{2,}")]
     private static partial Regex RepeatedLetters();
+
     public static string? GetReply(string question)
     {
         var words = RepeatedLetters().Replace(PersianText.Normalize(question), "$1").Split(' ', StringSplitOptions.RemoveEmptyEntries);

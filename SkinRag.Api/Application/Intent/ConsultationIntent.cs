@@ -19,6 +19,7 @@ public enum ConsultationIntent
 public sealed record IntentDecision(ConsultationIntent Intent, double Confidence, string Source)
 {
     public string Code => IntentCodes.ToCode(Intent);
+
     public bool IsRelevant => Intent is not (ConsultationIntent.Greeting or ConsultationIntent.OffTopic or ConsultationIntent.Unsafe or ConsultationIntent.Unclear);
 }
 
@@ -39,6 +40,7 @@ public static class IntentCodes
         ["UNSAFE"] = ConsultationIntent.Unsafe,
         ["UNCLEAR"] = ConsultationIntent.Unclear
     };
+
     public static string[] All => Codes.Keys.ToArray();
 
     public static bool TryParse(string code, out ConsultationIntent intent) => Codes.TryGetValue(code, out intent);

@@ -8,7 +8,9 @@ using SkinRag.Api.Models;
 namespace SkinRag.Api.Services;
 
 public sealed record KnowledgeSnapshot(IReadOnlyList<KnowledgeDocument> Documents, bool IsReady, DateTime? UpdatedAtUtc);
+
 public sealed class IndexNotReadyException(string message) : Exception(message);
+
 public sealed record KnowledgeIndexStatus(
     int IndexedProducts,
     bool IsReady,
@@ -21,6 +23,7 @@ public sealed record KnowledgeIndexStatus(
     string ChatModel,
     string? LastError,
     string ManualRebuildMode = "disabled");
+
 public sealed class KnowledgeIndexService(
     IDbContextFactory<AppDbContext> dbFactory,
     OllamaClient ollama,
@@ -31,21 +34,23 @@ public sealed class KnowledgeIndexService(
     private KnowledgeSnapshot _snapshot = new(Array.Empty<KnowledgeDocument>(), false, null);
     private int _isRebuilding, _processed, _total, _cached;
     private string? _lastError;
+
     public KnowledgeSnapshot Snapshot() => Volatile.Read(ref _snapshot);
+
     public KnowledgeIndexStatus Status()
     {
         var snapshot = Snapshot();
         return new KnowledgeIndexStatus(
-                        snapshot.Documents.Count,
-                        snapshot.IsReady,
-                        snapshot.UpdatedAtUtc,
-                        Volatile.Read(ref _isRebuilding) == 1,
-                        Volatile.Read(ref _processed),
-                        Volatile.Read(ref _total),
-                        Volatile.Read(ref _cached),
-                        ollama.EmbeddingModel,
-                        configuration["Ollama:ChatModel"] ?? "",
-                        Volatile.Read(ref _lastError));
+            snapshot.Documents.Count,
+            snapshot.IsReady,
+            snapshot.UpdatedAtUtc,
+            Volatile.Read(ref _isRebuilding) == 1,
+            Volatile.Read(ref _processed),
+            Volatile.Read(ref _total),
+            Volatile.Read(ref _cached),
+            ollama.EmbeddingModel,
+            configuration["Ollama:ChatModel"] ?? "",
+            Volatile.Read(ref _lastError));
     }
 
     public async Task RebuildAsync(CancellationToken cancellationToken = default, bool force = false)
@@ -58,7 +63,6 @@ public sealed class KnowledgeIndexService(
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
             var products = await CatalogService.Hydrate(db.Products.AsNoTracking().Where(p => p.IsActive).OrderBy(p => p.Id))
-
                 .ToListAsync(cancellationToken);
             Volatile.Write(ref _total, products.Count);
             var cache = await db.ProductEmbeddings.Where(e => e.Model == ollama.EmbeddingModel).ToDictionaryAsync(e => e.ProductId, cancellationToken);
@@ -71,7 +75,6 @@ public sealed class KnowledgeIndexService(
                 var content = ToKnowledgeText(p);
                 var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(version + "|" + prefix + content)));
                 if (!force && cache.TryGetValue(p.Id, out var stored) && stored.ContentHash == hash
-
                     && TryReadVector(stored, out var vector))
                 {
                     next[p.Id] = new KnowledgeDocument(p.Id, content, vector);
@@ -120,8 +123,8 @@ public sealed class KnowledgeIndexService(
             }
 
             Volatile.Write(
-                                ref _snapshot,
-                                new KnowledgeSnapshot(next.Values.OrderBy(x => x.ProductId).ToArray(), true, DateTime.UtcNow));
+                ref _snapshot,
+                new KnowledgeSnapshot(next.Values.OrderBy(x => x.ProductId).ToArray(), true, DateTime.UtcNow));
             Volatile.Write(ref _lastError, null);
             logger.LogInformation("Index ready: {Count} products, {Cached} from SQL cache", next.Count, _cached);
         }
@@ -144,9 +147,7 @@ public sealed class KnowledgeIndexService(
         {
             var parsed = JsonSerializer.Deserialize<float[]>(stored.VectorJson);
             if (parsed == null || parsed.Length != stored.Dimensions || parsed.Length == 0
-
                 || parsed.Any(x => !float.IsFinite(x))
-
                 || !parsed.Any(x => x != 0))
             {
                 return false;
@@ -175,7 +176,7 @@ public sealed class KnowledgeIndexService(
         Warnings: {p.Warnings}
         Usage: {p.UsageInstructions}
         Variants: {string.Join(
-                        "; ",
-                        p.Variants.Where(x => x.IsActive).OrderBy(x => x.Id).Select(x => $"{x.SizeValue} {x.SizeUnit} {x.Shade} {x.Finish}"))}
+        "; ",
+        p.Variants.Where(x => x.IsActive).OrderBy(x => x.Id).Select(x => $"{x.SizeValue} {x.SizeUnit} {x.Shade} {x.Finish}"))}
         """;
 }

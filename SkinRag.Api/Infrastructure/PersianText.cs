@@ -7,6 +7,7 @@ namespace SkinRag.Api.Infrastructure;
 public static class PersianText
 {
     private static readonly FrozenSet<string> StopWords = "برای من یک و با به از در که چه می میخوام میخواهم دارم محصول محصولات لطفا".Split(' ').ToFrozenSet();
+
     public static string Normalize(string text)
     {
         var result = new StringBuilder(text.Length);
@@ -37,6 +38,5 @@ public static class PersianText
     }
 
     public static FrozenSet<string> SearchTokens(string text) => Normalize(text).Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(word => word.Length > 1 && !StopWords.Contains(word))
-
         .ToFrozenSet();
 }

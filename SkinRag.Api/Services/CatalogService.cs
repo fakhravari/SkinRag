@@ -7,22 +7,15 @@ namespace SkinRag.Api.Services;
 public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory)
 {
     public static IQueryable<Product> Hydrate(IQueryable<Product> query) => query.Include(p => p.CategoryDetails).ThenInclude(c => c!.Parent).Include(p => p.BrandDetails)
-
         .Include(p => p.Variants)
-
         .Include(p => p.ProductProfiles)
-
         .ThenInclude(x => x.Profile)
-
         .Include(p => p.ProductConcerns)
-
         .ThenInclude(x => x.Concern)
-
         .Include(p => p.ProductIngredients)
-
         .ThenInclude(x => x.Ingredient)
-
         .AsSplitQuery();
+
     public static IQueryable<Product> Filter(IQueryable<Product> query, CatalogFilters f, bool inStockOnly = true)
     {
         query = query.Where(p => p.IsActive);
@@ -34,10 +27,8 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory)
         if (!string.IsNullOrWhiteSpace(f.CategorySlug))
         {
             query = query.Where(p => p.CategoryDetails != null
-
                 && (p.CategoryDetails.Slug == f.CategorySlug
-
-                    || (p.CategoryDetails.Parent != null && p.CategoryDetails.Parent.Slug == f.CategorySlug)));
+                || (p.CategoryDetails.Parent != null && p.CategoryDetails.Parent.Slug == f.CategorySlug)));
         }
 
         if (!string.IsNullOrWhiteSpace(f.BrandSlug))
@@ -48,18 +39,14 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory)
         if (!string.IsNullOrWhiteSpace(f.SkinType))
         {
             query = query.Where(p => p.ProductProfiles.Any(x => x.Profile.Kind == "skin"
-
                 && (x.Profile.Slug == f.SkinType || x.Profile.Name == f.SkinType || x.Profile.Slug == "skin-all"))
-
                 || (!p.ProductProfiles.Any() && p.SkinTypes != null && p.SkinTypes.Contains(f.SkinType)));
         }
 
         if (!string.IsNullOrWhiteSpace(f.HairType))
         {
             query = query.Where(p => p.ProductProfiles.Any(x => x.Profile.Kind == "hair"
-
                 && (x.Profile.Slug == f.HairType || x.Profile.Name == f.HairType || x.Profile.Slug == "hair-all"))
-
                 || (!p.ProductProfiles.Any() && p.HairTypes != null && p.HairTypes.Contains(f.HairType)));
         }
 
@@ -77,91 +64,67 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory)
         {
             // Unknown legacy formulas are not eligible for an ingredient exclusion claim.
             query = query.Where(p => p.ProductIngredients.Any()
-
                 && !p.ProductIngredients.Any(x => f.ExcludeIngredientSlugs.Contains(x.Ingredient.Slug)));
         }
-
         // Every condition must hold for the SAME variant; aggregate parent prices/stock are not authoritative.
         return query.Where(p => p.Variants.Any(v => v.IsActive && (!inStockOnly || v.StockQuantity > 0)
-
             && (!f.MinPrice.HasValue || v.Price >= f.MinPrice)
-
             && (!f.MaxPrice.HasValue || v.Price <= f.MaxPrice)
-
             && (f.Shade == null || v.Shade == f.Shade)
-
             && (f.Finish == null || v.Finish == f.Finish)
-
             && (!f.SizeValue.HasValue || v.SizeValue == f.SizeValue)
-
             && (f.SizeUnit == null || v.SizeUnit == f.SizeUnit))
-
             || (!p.Variants.Any() && (!inStockOnly || p.StockQuantity > 0)
-
-                && (!f.MinPrice.HasValue || p.Price >= f.MinPrice)
-
-                && (!f.MaxPrice.HasValue || p.Price <= f.MaxPrice)
-
-                && f.Shade == null
-
-                && f.Finish == null
-
-                && !f.SizeValue.HasValue
-
-                && f.SizeUnit == null));
+            && (!f.MinPrice.HasValue || p.Price >= f.MinPrice)
+            && (!f.MaxPrice.HasValue || p.Price <= f.MaxPrice)
+            && f.Shade == null
+            && f.Finish == null
+            && !f.SizeValue.HasValue
+            && f.SizeUnit == null));
     }
 
     public static IReadOnlyList<VariantDto> EligibleVariants(Product p, CatalogFilters f, bool inStockOnly = true) => p.Variants.Where(v => v.IsActive && (!inStockOnly || v.StockQuantity > 0)
-
         && (!f.MinPrice.HasValue || v.Price >= f.MinPrice)
-
         && (!f.MaxPrice.HasValue || v.Price <= f.MaxPrice)
-
         && (f.Shade == null || v.Shade == f.Shade)
-
         && (f.Finish == null || v.Finish == f.Finish)
-
         && (!f.SizeValue.HasValue || v.SizeValue == f.SizeValue)
-
         && (f.SizeUnit == null || v.SizeUnit == f.SizeUnit))
-
         .OrderBy(v => v.Price)
-
         .ThenBy(v => v.Id)
-
         .Select(v => new VariantDto(v.Id, v.Sku, v.Name, v.SizeValue, v.SizeUnit, v.Shade, v.Finish, v.Price, v.StockQuantity))
-
         .ToArray();
+
     public static ProductDto ToDto(Product p, CatalogFilters f, bool inStockOnly = true)
     {
         var variants = EligibleVariants(p, f, inStockOnly);
         decimal? price = p.Variants.Count > 0 ? variants.Count > 0 ? variants.Min(v => v.Price) : null : p.Price;
         var stock = p.Variants.Count > 0 ? variants.Sum(v => v.StockQuantity) : p.StockQuantity;
         return new ProductDto(
-                        p.Id,
-                        p.Sku,
-                        p.Name,
-                        p.BrandDetails?.Name ?? p.Brand,
-                        p.BrandDetails?.Slug,
-                        p.CategoryDetails?.Name ?? p.Category,
-                        p.CategoryDetails?.Slug,
-                        p.CategoryDetails?.Domain,
-                        price,
-                        p.Currency,
-                        stock,
-                        p.IsDemo,
-                        p.FragranceFree,
-                        p.SkinTypes,
-                        p.HairTypes,
-                        p.Description,
-                        p.Warnings,
-                        p.UsageInstructions,
-                        p.ProductProfiles.Select(x => x.Profile.Slug).Order().ToArray(),
-                        p.ProductConcerns.Select(x => x.Concern.Slug).Order().ToArray(),
-                        p.ProductIngredients.Select(x => x.Ingredient.Slug).Order().ToArray(),
-                        variants,
-                        p.Ingredients,
-                        p.Concerns);
+            p.Id,
+            p.Sku,
+            p.Name,
+            p.BrandDetails?.Name ?? p.Brand,
+            p.BrandDetails?.Slug,
+            p.CategoryDetails?.Name ?? p.Category,
+            p.CategoryDetails?.Slug,
+            p.CategoryDetails?.Domain,
+            price,
+            p.Currency,
+            stock,
+            p.IsDemo,
+            p.FragranceFree,
+            p.SkinTypes,
+            p.HairTypes,
+            p.Description,
+            p.Warnings,
+            p.UsageInstructions,
+            p.ProductProfiles.Select(x => x.Profile.Slug).Order().ToArray(),
+            p.ProductConcerns.Select(x => x.Concern.Slug).Order().ToArray(),
+            p.ProductIngredients.Select(x => x.Ingredient.Slug).Order().ToArray(),
+            variants,
+            p.Ingredients,
+            p.Concerns);
     }
 
     public static async Task ValidateFiltersAsync(AppDbContext db, CatalogFilters f, CancellationToken ct)
@@ -182,14 +145,12 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory)
         }
 
         if (f.SkinType != null
-
             && !await db.Profiles.AnyAsync(x => x.Kind == "skin" && (x.Slug == f.SkinType || x.Name == f.SkinType), ct))
         {
             throw new ArgumentException("نوع پوست ناشناخته است؛ از نام یا slug پروفایل استفاده کنید.");
         }
 
         if (f.HairType != null
-
             && !await db.Profiles.AnyAsync(x => x.Kind == "hair" && (x.Slug == f.HairType || x.Name == f.HairType), ct))
         {
             throw new ArgumentException("نوع مو ناشناخته است؛ از نام یا slug پروفایل استفاده کنید.");
@@ -198,7 +159,6 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory)
         if (f.ExcludeIngredientSlugs.Length > 0)
         {
             var known = await db.Ingredients.Where(x => f.ExcludeIngredientSlugs.Contains(x.Slug)).Select(x => x.Slug)
-
                 .ToListAsync(ct);
             if (known.Count != f.ExcludeIngredientSlugs.Distinct(StringComparer.OrdinalIgnoreCase).Count())
             {
@@ -215,21 +175,18 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory)
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             query = query.Where(p => p.Name.Contains(request.Search)
-
                 || (p.SearchKeywords != null && p.SearchKeywords.Contains(request.Search))
-
                 || (p.Sku != null && p.Sku.Contains(request.Search)));
         }
 
         var total = await query.CountAsync(ct);
         var products = await Hydrate(query.OrderBy(p => p.Id).Skip((request.Page - 1) * request.PageSize).Take(request.PageSize))
-
             .ToListAsync(ct);
         return new CatalogPage(
-                        request.Page,
-                        request.PageSize,
-                        total,
-                        products.Select(p => ToDto(p, request, request.InStockOnly)).ToArray());
+            request.Page,
+            request.PageSize,
+            total,
+            products.Select(p => ToDto(p, request, request.InStockOnly)).ToArray());
     }
 
     public async Task<ProductDto?> GetAsync(int id, CancellationToken ct)
