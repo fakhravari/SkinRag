@@ -2,15 +2,24 @@ namespace SkinRag.Api.Application.Intent;
 
 public enum ConsultationIntent
 {
-    Greeting, SkinConsultation, ProductSearch, ProductDetails, ProductComparison,
-    PriceInquiry, AvailabilityInquiry, RoutineRecommendation, FollowUp, OffTopic, Unsafe, Unclear
+    Greeting,
+    SkinConsultation,
+    ProductSearch,
+    ProductDetails,
+    ProductComparison,
+    PriceInquiry,
+    AvailabilityInquiry,
+    RoutineRecommendation,
+    FollowUp,
+    OffTopic,
+    Unsafe,
+    Unclear
 }
 
 public sealed record IntentDecision(ConsultationIntent Intent, double Confidence, string Source)
 {
     public string Code => IntentCodes.ToCode(Intent);
-    public bool IsRelevant => Intent is not (ConsultationIntent.Greeting or ConsultationIntent.OffTopic
-        or ConsultationIntent.Unsafe or ConsultationIntent.Unclear);
+    public bool IsRelevant => Intent is not (ConsultationIntent.Greeting or ConsultationIntent.OffTopic or ConsultationIntent.Unsafe or ConsultationIntent.Unclear);
 }
 
 public static class IntentCodes
@@ -31,6 +40,7 @@ public static class IntentCodes
         ["UNCLEAR"] = ConsultationIntent.Unclear
     };
     public static string[] All => Codes.Keys.ToArray();
+
     public static bool TryParse(string code, out ConsultationIntent intent) => Codes.TryGetValue(code, out intent);
     public static string ToCode(ConsultationIntent intent) => Codes.Single(x => x.Value == intent).Key;
 }

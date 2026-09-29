@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json;
-using SkinRag.Api.Infrastructure.AI;
+using SkinRag.Api.Application.Abstractions;
 
 namespace SkinRag.Api.Services;
 
@@ -16,44 +16,49 @@ public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfigur
     };
     public string EmbeddingModel => configuration["Ollama:EmbeddingModel"] ?? "nomic-embed-text";
 
-    public async Task<float[]> EmbedAsync(
-        string text, CancellationToken cancellationToken = default)
+    public async Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken = default)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(20));
         return (await EmbedBatchAsync([text], timeout.Token))[0];
     }
 
-    public async Task<float[][]> EmbedBatchAsync(
-        IReadOnlyList<string> texts, CancellationToken cancellationToken = default)
+    public async Task<float[][]> EmbedBatchAsync(IReadOnlyList<string> texts, CancellationToken cancellationToken = default)
     {
-        if (texts.Count == 0) return [];
+        if (texts.Count == 0)
+        {
+            return [];
+        }
+
         using var httpClient = httpClientFactory.CreateClient("Ollama");
-        using var response = await httpClient.PostAsJsonAsync(
-            "/api/embed",
-            new { model = EmbeddingModel, input = texts, truncate = false },
-            cancellationToken);
+        using var response = await httpClient.PostAsJsonAsync("/api/embed", new
+        {
+            model = EmbeddingModel,
+            input = texts,
+            truncate = false
+        }, cancellationToken);
         response.EnsureSuccessStatusCode();
-
-        var result = await response.Content.ReadFromJsonAsync<EmbedResponse>(
-            cancellationToken: cancellationToken);
-
-        if (result?.Embeddings is not { Length: > 0 } embeddings || embeddings.Length != texts.Count ||
-            embeddings.Any(v => v is null || v.Length == 0 || v.Any(x => !float.IsFinite(x)) || !v.Any(x => x != 0)))
+        var result = await response.Content.ReadFromJsonAsync<EmbedResponse>(cancellationToken: cancellationToken);
+        if (result?.Embeddings is not { Length: > 0 } embeddings || embeddings.Length != texts.Count
+            || embeddings.Any(v => v is null || v.Length == 0 || v.Any(x => !float.IsFinite(x)) || !v.Any(x => x != 0)))
+        {
             throw new InvalidOperationException("Ollama returned invalid embeddings.");
+        }
 
         return embeddings;
     }
 
-    public async Task<T> ChatStructuredAsync<T>(string systemPrompt, object input, JsonElement schema,
-        ModelRequest options, CancellationToken cancellationToken) where T : class
+    public async Task<T> ChatStructuredAsync<T>(
+        string systemPrompt,
+        object input,
+        JsonElement schema,
+        ModelRequest options,
+        CancellationToken cancellationToken) where T : class
     {
-        var model = configuration[$"Ollama:{options.Stage}Model"] ?? configuration["Ollama:ChatModel"]
-            ?? throw new InvalidOperationException("Ollama:ChatModel is missing.");
+        var model = configuration[$"Ollama:{options.Stage}Model"] ?? configuration["Ollama:ChatModel"] ?? throw new InvalidOperationException("Ollama:ChatModel is missing.");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(options.TimeoutSeconds, 1, 70)));
         cancellationToken = timeout.Token;
-
         using var httpClient = httpClientFactory.CreateClient("Ollama");
         using var response = await httpClient.PostAsJsonAsync(
             "/api/chat",
@@ -63,12 +68,9 @@ public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfigur
                 stream = false,
                 keep_alive = "30m",
                 format = schema,
-                messages = new[]
-                {
-                    new { role = "system", content = systemPrompt + "\nReturn JSON with these fields: " +
-                        string.Join(", ", schema.GetProperty("properties").EnumerateObject().Select(p => p.Name)) },
-                    new { role = "user", content = JsonSerializer.Serialize(input, StructuredJsonOptions) }
-                },
+                messages = new[] { new { role = "system",
+                        content = systemPrompt + "\nReturn JSON with these fields: " + string.Join(", ", schema.GetProperty("properties").EnumerateObject().Select(p => p.Name)) }, new { role = "user",
+            content = JsonSerializer.Serialize(input, StructuredJsonOptions) } },
                 options = new
                 {
                     temperature = 0,
@@ -78,15 +80,27 @@ public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfigur
             },
             cancellationToken);
         response.EnsureSuccessStatusCode();
-
         ChatResponse? result;
-        try { result = await response.Content.ReadFromJsonAsync<ChatResponse>(cancellationToken: cancellationToken); }
-        catch (JsonException) { throw new InvalidModelOutputException("Ollama returned an invalid chat response envelope."); }
+        try
+        {
+            result = await response.Content.ReadFromJsonAsync<ChatResponse>(cancellationToken: cancellationToken);
+        }
+        catch (JsonException)
+        {
+            throw new InvalidModelOutputException("Ollama returned an invalid chat response envelope.");
+        }
 
         if (string.IsNullOrWhiteSpace(result?.Message?.Content) || result.Message.Content.Length > 16000)
+        {
             throw new InvalidModelOutputException("Ollama returned empty or oversized JSON.");
-        logger.LogInformation("Ollama {Stage}: {Tokens} input tokens, {Seconds:F1}s, load {LoadSeconds:F1}s",
-            options.Stage, result.PromptTokens, result.TotalDuration / 1e9, result.LoadDuration / 1e9);
+        }
+
+        logger.LogInformation(
+            "Ollama {Stage}: {Tokens} input tokens, {Seconds:F1}s, load {LoadSeconds:F1}s",
+            options.Stage,
+            result.PromptTokens,
+            result.TotalDuration / 1e9,
+            result.LoadDuration / 1e9);
         return ParseStructured<T>(result.Message.Content);
     }
 
@@ -94,11 +108,9 @@ public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfigur
     {
         try
         {
-            // Reject duplicate JSON properties as well as missing/unknown fields.
             using var document = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 16 });
             ValidateProperties(document.RootElement);
-            return JsonSerializer.Deserialize<T>(json, StructuredJsonOptions)
-                ?? throw new InvalidModelOutputException("Ollama returned null JSON.");
+            return JsonSerializer.Deserialize<T>(json, StructuredJsonOptions) ?? throw new InvalidModelOutputException("Ollama returned null JSON.");
         }
         catch (JsonException)
         {
@@ -113,12 +125,21 @@ public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfigur
             var keys = new HashSet<string>(StringComparer.Ordinal);
             foreach (var property in element.EnumerateObject())
             {
-                if (!keys.Add(property.Name)) throw new JsonException("Duplicate JSON property.");
+                if (!keys.Add(property.Name))
+                {
+                    throw new JsonException("Duplicate JSON property.");
+                }
+
                 ValidateProperties(property.Value);
             }
         }
         else if (element.ValueKind == JsonValueKind.Array)
-            foreach (var child in element.EnumerateArray()) ValidateProperties(child);
+        {
+            foreach (var child in element.EnumerateArray())
+            {
+                ValidateProperties(child);
+            }
+        }
     }
 
     private sealed class EmbedResponse
@@ -131,9 +152,15 @@ public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfigur
     {
         [JsonPropertyName("message")]
         public ChatMessage? Message { get; set; }
-        [JsonPropertyName("total_duration")] public long TotalDuration { get; set; }
-        [JsonPropertyName("load_duration")] public long LoadDuration { get; set; }
-        [JsonPropertyName("prompt_eval_count")] public int PromptTokens { get; set; }
+
+        [JsonPropertyName("total_duration")]
+        public long TotalDuration { get; set; }
+
+        [JsonPropertyName("load_duration")]
+        public long LoadDuration { get; set; }
+
+        [JsonPropertyName("prompt_eval_count")]
+        public int PromptTokens { get; set; }
     }
 
     private sealed class ChatMessage

@@ -2,18 +2,236 @@
     ViewData["Title"] = "مدیریت دانش";
 }
 <main class="container">
-    <div class="page-heading"><div><div class="eyebrow">KNOWLEDGE WORKSPACE</div><h1>دانش همیشه به‌روز.</h1><p>وضعیت کاتالوگ، آمادگی پاسخ‌گویی و بازسازی دانش را از اینجا کنترل کنید.</p></div><button id="refreshStatus" type="button" class="button secondary"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#refresh" /></svg>تازه‌سازی وضعیت</button></div>
-    <div id="adminError" class="notice error admin-error" role="alert" hidden></div>
-    <section class="stats-grid" aria-label="آمار کاتالوگ"><div class="panel stat-card"><span class="stat-icon"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#database" /></svg></span><div><div id="totalProducts" class="stat-number">—</div><div class="stat-label">محصول در کاتالوگ</div></div></div><div class="panel stat-card"><span class="stat-icon green"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#check" /></svg></span><div><div id="availableProducts" class="stat-number">—</div><div class="stat-label">محصول فعال و موجود</div></div></div><div class="panel stat-card"><span class="stat-icon amber"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#layers" /></svg></span><div><div id="variants" class="stat-number">—</div><div class="stat-label">تنوع اندازه و رنگ</div></div></div><div class="panel stat-card"><span class="stat-icon"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#leaf" /></svg></span><div><div id="categories" class="stat-number">—</div><div class="stat-label">دسته و زیردسته</div></div></div></section>
-    <div class="admin-layout">
-        <section class="panel admin-panel"><div class="panel-heading"><h2>وضعیت پایگاه دانش</h2><span id="indexBadge" class="pill warn" role="status"><span class="dot"></span><span>در حال اتصال</span></span></div><div class="status-headline"><span id="statusHeroIcon" class="status-hero-icon pending"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#activity" /></svg></span><div><h3 id="statusTitle">بررسی وضعیت…</h3><p id="statusDescription">اطلاعات وضعیت از سرور دریافت می‌شود.</p></div></div><div id="indexProgress" class="progress-track" role="progressbar" aria-label="پیشرفت ساخت دانش" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="progressBar" class="progress-bar"></div></div><div class="progress-caption"><span id="progressCaption">—</span><span id="progressPercent">—</span></div><dl class="metric-list"><div><dt>محصول‌های ایندکس‌شده</dt><dd id="indexedProducts">—</dd></div><div><dt>خوانده‌شده از کش دیتابیس</dt><dd id="cachedProducts">—</dd></div><div><dt>آخرین بازسازی موفق</dt><dd id="lastIndexed">—</dd></div><div><dt>وضعیت اتصال دیتابیس</dt><dd id="databaseStatus">در حال بررسی</dd></div><div><dt>مدل بردارسازی</dt><dd id="embeddingModel" class="latin">—</dd></div><div><dt>مدل گفت‌وگو</dt><dd id="chatModel" class="latin">—</dd></div></dl><div id="indexError" class="notice error" style="margin-top:18px" role="alert" hidden></div></section>
-        <section class="panel admin-panel"><div class="panel-heading"><h2>بازسازی دانش</h2><span class="avatar"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#refresh" /></svg></span></div><p class="muted small">محصول‌های فعال را دوباره بررسی کنید. در حالت معمول، فقط محتوای تغییرکرده بردار تازه می‌گیرد.</p><div id="adminKeyField" class="field" style="margin-top:20px"><label for="adminKey">کلید مدیریت</label><input id="adminKey" type="password" autocomplete="off" placeholder="کلید مدیریت سرور" aria-describedby="keyHint"><span id="keyHint" class="field-hint">کلید ذخیره نمی‌شود و فقط برای این درخواست استفاده می‌شود.</span></div><div id="localAccessNote" class="notice info" style="margin:18px 0" hidden>دسترسی محلی توسعه فعال است؛ در این اتصال نیازی به کلید نیست.</div><div class="rebuild-options"><label class="checkbox"><input id="forceRebuild" type="checkbox"><span>تولید دوباره تمام بردارها</span></label><p>کش بردارها نادیده گرفته می‌شود. مناسب تغییر مدل؛ زمان بیشتری نیاز دارد.</p></div><button id="rebuildKnowledge" class="button wide" type="button" disabled><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#refresh" /></svg><span>بازسازی دانش</span></button><div id="rebuildHint" class="field-hint disabled-note">در حال بررسی دسترسی بازسازی…</div><div class="separator"></div><div class="notice"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#shield" /></svg><span>قیمت و موجودی در هر درخواست از دیتابیس خوانده می‌شوند؛ تغییر آن‌ها به بازسازی بردارها نیاز ندارد.</span></div></section>
+    <div class="page-heading">
+        <div>
+            <div class="eyebrow">KNOWLEDGE WORKSPACE</div>
+            <h1>دانش همیشه به‌روز.</h1>
+            <p>وضعیت کاتالوگ، آمادگی پاسخ‌گویی و بازسازی دانش را از اینجا کنترل کنید.</p>
+        </div>
+        <button id="refreshStatus" type="button" class="button secondary">
+            <svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#refresh" /></svg>
+            تازه‌سازی وضعیت
+        </button>
     </div>
-    <div class="admin-lower"><section class="panel admin-panel"><div class="panel-heading"><h2>ترکیب کاتالوگ</h2><span class="pill warn">داده آزمایشی</span></div><div id="domainStats"></div><div class="mini-stats"><span>برندها: <b id="brandsCount">—</b></span><span>محصول‌های آزمایشی: <b id="demoCount">—</b></span><span>محصول‌های فعال: <b id="activeCount">—</b></span></div></section><section class="panel admin-panel"><div class="panel-heading"><h2>رویدادهای این نشست</h2><span class="small muted">به‌روزرسانی هر ۵ ثانیه</span></div><div id="eventLog" class="event-log" role="log" aria-live="polite"><p class="empty-log">پس از دریافت وضعیت، رویدادها اینجا نمایش داده می‌شوند.</p></div></section></div>
-    <footer class="page-footer"><span>SkinRag · مدیریت کاتالوگ و دانش</span><span id="lastChecked">هنوز بررسی نشده</span></footer>
+    <div id="adminError" class="notice error admin-error" role="alert" hidden></div>
+    <section class="stats-grid" aria-label="آمار کاتالوگ">
+        <div class="panel stat-card">
+            <span class="stat-icon">
+                <svg class="icon" aria-hidden="true">
+                    <use href="/assets/icons.svg#database" />
+                </svg>
+            </span>
+            <div>
+                <div id="totalProducts" class="stat-number">—</div>
+                <div class="stat-label">محصول در کاتالوگ</div>
+            </div>
+        </div>
+        <div class="panel stat-card">
+            <span class="stat-icon green">
+                <svg class="icon" aria-hidden="true">
+                    <use href="/assets/icons.svg#check" />
+                </svg>
+            </span>
+            <div>
+                <div id="availableProducts" class="stat-number">—</div>
+                <div class="stat-label">محصول فعال و موجود</div>
+            </div>
+        </div>
+        <div class="panel stat-card">
+            <span class="stat-icon amber">
+                <svg class="icon" aria-hidden="true">
+                    <use href="/assets/icons.svg#layers" />
+                </svg>
+            </span>
+            <div>
+                <div id="variants" class="stat-number">—</div>
+                <div class="stat-label">تنوع اندازه و رنگ</div>
+            </div>
+        </div>
+        <div class="panel stat-card">
+            <span class="stat-icon">
+                <svg class="icon" aria-hidden="true">
+                    <use href="/assets/icons.svg#leaf" />
+                </svg>
+            </span>
+            <div>
+                <div id="categories" class="stat-number">—</div>
+                <div class="stat-label">دسته و زیردسته</div>
+            </div>
+        </div>
+    </section>
+    <div class="admin-layout">
+        <section class="panel admin-panel">
+            <div class="panel-heading">
+                <h2>وضعیت پایگاه دانش</h2>
+                <span id="indexBadge" class="pill warn" role="status">
+                    <span class="dot"></span>
+                    <span>در حال اتصال</span>
+                </span>
+            </div>
+            <div class="status-headline">
+                <span id="statusHeroIcon" class="status-hero-icon pending">
+                    <svg class="icon" aria-hidden="true">
+                        <use href="/assets/icons.svg#activity" />
+                    </svg>
+                </span>
+                <div>
+                    <h3 id="statusTitle">بررسی وضعیت…</h3>
+                    <p id="statusDescription">اطلاعات وضعیت از سرور دریافت می‌شود.</p>
+                </div>
+            </div>
+            <div
+                id="indexProgress"
+                class="progress-track"
+                role="progressbar"
+                aria-label="پیشرفت ساخت دانش"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow="0"
+            >
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+            <div class="progress-caption">
+                <span id="progressCaption">—</span>
+                <span id="progressPercent">—</span>
+            </div>
+            <dl class="metric-list">
+                <div>
+                    <dt>محصول‌های ایندکس‌شده</dt>
+                    <dd id="indexedProducts">—</dd>
+                </div>
+                <div>
+                    <dt>خوانده‌شده از کش دیتابیس</dt>
+                    <dd id="cachedProducts">—</dd>
+                </div>
+                <div>
+                    <dt>آخرین بازسازی موفق</dt>
+                    <dd id="lastIndexed">—</dd>
+                </div>
+                <div>
+                    <dt>وضعیت اتصال دیتابیس</dt>
+                    <dd id="databaseStatus">در حال بررسی</dd>
+                </div>
+                <div>
+                    <dt>مدل بردارسازی</dt>
+                    <dd id="embeddingModel" class="latin">—</dd>
+                </div>
+                <div>
+                    <dt>مدل گفت‌وگو</dt>
+                    <dd id="chatModel" class="latin">—</dd>
+                </div>
+            </dl>
+            <div
+                id="indexError"
+                class="notice error"
+                style="margin-top: 18px"
+                role="alert"
+                hidden
+            ></div>
+        </section>
+        <section class="panel admin-panel">
+            <div class="panel-heading">
+                <h2>بازسازی دانش</h2>
+                <span class="avatar">
+                    <svg class="icon" aria-hidden="true">
+                        <use href="/assets/icons.svg#refresh" />
+                    </svg>
+                </span>
+            </div>
+            <p class="muted small">
+                محصول‌های فعال را دوباره بررسی کنید. در حالت معمول، فقط محتوای تغییرکرده بردار تازه
+                می‌گیرد.
+            </p>
+            <div id="adminKeyField" class="field" style="margin-top: 20px">
+                <label for="adminKey">کلید مدیریت</label>
+                <input
+                    id="adminKey"
+                    type="password"
+                    autocomplete="off"
+                    placeholder="کلید مدیریت سرور"
+                    aria-describedby="keyHint"
+                />
+                <span id="keyHint" class="field-hint">
+                    کلید ذخیره نمی‌شود و فقط برای این درخواست استفاده می‌شود.
+                </span>
+            </div>
+            <div id="localAccessNote" class="notice info" style="margin: 18px 0" hidden>
+                دسترسی محلی توسعه فعال است؛ در این اتصال نیازی به کلید نیست.
+            </div>
+            <div class="rebuild-options">
+                <label class="checkbox">
+                    <input id="forceRebuild" type="checkbox" />
+                    <span>تولید دوباره تمام بردارها</span>
+                </label>
+                <p>کش بردارها نادیده گرفته می‌شود. مناسب تغییر مدل؛ زمان بیشتری نیاز دارد.</p>
+            </div>
+            <button id="rebuildKnowledge" class="button wide" type="button" disabled>
+                <svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#refresh" /></svg>
+                <span>بازسازی دانش</span>
+            </button>
+            <div id="rebuildHint" class="field-hint disabled-note">
+                در حال بررسی دسترسی بازسازی…
+            </div>
+            <div class="separator"></div>
+            <div class="notice">
+                <svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#shield" /></svg>
+                <span>
+                    قیمت و موجودی در هر درخواست از دیتابیس خوانده می‌شوند؛ تغییر آن‌ها به بازسازی
+                    بردارها نیاز ندارد.
+                </span>
+            </div>
+        </section>
+    </div>
+    <div class="admin-lower">
+        <section class="panel admin-panel">
+            <div class="panel-heading">
+                <h2>ترکیب کاتالوگ</h2>
+                <span class="pill warn">داده آزمایشی</span>
+            </div>
+            <div id="domainStats"></div>
+            <div class="mini-stats">
+                <span>
+                    برندها:
+                    <b id="brandsCount">—</b>
+                </span>
+                <span>
+                    محصول‌های آزمایشی:
+                    <b id="demoCount">—</b>
+                </span>
+                <span>
+                    محصول‌های فعال:
+                    <b id="activeCount">—</b>
+                </span>
+            </div>
+        </section>
+        <section class="panel admin-panel">
+            <div class="panel-heading">
+                <h2>رویدادهای این نشست</h2>
+                <span class="small muted">به‌روزرسانی هر ۵ ثانیه</span>
+            </div>
+            <div id="eventLog" class="event-log" role="log" aria-live="polite">
+                <p class="empty-log">پس از دریافت وضعیت، رویدادها اینجا نمایش داده می‌شوند.</p>
+            </div>
+        </section>
+    </div>
+    <footer class="page-footer">
+        <span>SkinRag · مدیریت کاتالوگ و دانش</span>
+        <span id="lastChecked">هنوز بررسی نشده</span>
+    </footer>
 </main>
-<dialog id="rebuildDialog" class="dialog" aria-labelledby="dialogTitle"><h2 id="dialogTitle">بازسازی دانش شروع شود؟</h2><p id="dialogDescription">محصول‌های فعال بررسی می‌شوند و دانش به‌روز خواهد شد. کاتالوگ محصولات حذف یا تغییر نمی‌کند.</p><div class="dialog-actions"><button id="confirmRebuild" class="button" type="button">شروع بازسازی</button><button id="cancelRebuild" class="button secondary" type="button">انصراف</button></div></dialog>
-<noscript><p class="notice error">برای استفاده از پنل مدیریت، JavaScript مرورگر باید فعال باشد.</p></noscript>
+<dialog id="rebuildDialog" class="dialog" aria-labelledby="dialogTitle">
+    <h2 id="dialogTitle">بازسازی دانش شروع شود؟</h2>
+    <p id="dialogDescription">
+        محصول‌های فعال بررسی می‌شوند و دانش به‌روز خواهد شد. کاتالوگ محصولات حذف یا تغییر نمی‌کند.
+    </p>
+    <div class="dialog-actions">
+        <button id="confirmRebuild" class="button" type="button">شروع بازسازی</button>
+        <button id="cancelRebuild" class="button secondary" type="button">انصراف</button>
+    </div>
+</dialog>
+<noscript>
+    <p class="notice error">برای استفاده از پنل مدیریت، JavaScript مرورگر باید فعال باشد.</p>
+</noscript>
 
 @section Scripts {
     <script src="~/assets/admin.js" asp-append-version="true" defer></script>

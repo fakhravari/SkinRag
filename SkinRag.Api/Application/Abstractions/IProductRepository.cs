@@ -1,0 +1,11 @@
+using SkinRag.Api.Application.Retrieval;
+using SkinRag.Api.Models;
+
+namespace SkinRag.Api.Application.Abstractions;
+
+public interface IProductRepository
+{
+    Task<CatalogVocabulary> VocabularyAsync(CancellationToken ct);
+    Task<int[]> EligibleIdsAsync(SearchPlan plan, CancellationToken ct);
+    Task<IReadOnlyList<ProductDto>> LoadAsync(IEnumerable<int> ids, SearchPlan plan, CancellationToken ct);
+}

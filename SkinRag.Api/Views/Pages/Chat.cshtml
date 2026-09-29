@@ -2,49 +2,283 @@
     ViewData["Title"] = "گفت‌وگوی مراقبت";
 }
 <main class="container">
-    <div class="page-heading"><div><div class="eyebrow">YOUR CARE COMPANION</div><h1>از نیازتان بگویید.</h1><p>محصول‌های پوست، مو و زیبایی را متناسب با ترجیحات خود پیدا کنید.</p></div><span id="connectionBadge" class="pill warn" role="status"><span class="dot"></span><span>در حال اتصال</span></span></div>
-    <div id="chatConnection" class="notice info chat-connection" role="status" hidden><span id="connectionMessage"></span><button id="retryConnection" class="button soft" type="button" hidden>تلاش دوباره</button></div>
+    <div class="page-heading">
+        <div>
+            <div class="eyebrow">YOUR CARE COMPANION</div>
+            <h1>از نیازتان بگویید.</h1>
+            <p>محصول‌های پوست، مو و زیبایی را متناسب با ترجیحات خود پیدا کنید.</p>
+        </div>
+        <span id="connectionBadge" class="pill warn" role="status">
+            <span class="dot"></span>
+            <span>در حال اتصال</span>
+        </span>
+    </div>
+    <div id="chatConnection" class="notice info chat-connection" role="status" hidden>
+        <span id="connectionMessage"></span>
+        <button id="retryConnection" class="button soft" type="button" hidden>تلاش دوباره</button>
+    </div>
     <div class="chat-layout">
         <aside class="panel filters-panel" aria-label="ترجیحات محصول">
-            <div class="filter-panel-header"><h2 class="filter-title"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#leaf" /></svg>فیلترهای اختیاری</h2><button id="toggleFilters" class="button soft filter-toggle" type="button" aria-controls="filterContent" aria-expanded="false">نمایش فیلترها</button></div>
+            <div class="filter-panel-header">
+                <h2 class="filter-title">
+                    <svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#leaf" /></svg>
+                    فیلترهای اختیاری
+                </h2>
+                <button
+                    id="toggleFilters"
+                    class="button soft filter-toggle"
+                    type="button"
+                    aria-controls="filterContent"
+                    aria-expanded="false"
+                >
+                    نمایش فیلترها
+                </button>
+            </div>
             <div id="filterContent" class="filters-content">
-                <p class="muted small">بدون انتخاب فیلتر هم می‌توانید پیام بفرستید. فقط گزینه‌های مورد نیازتان را انتخاب کنید.</p>
-                <div class="domain-choices" role="group" aria-label="حوزه مراقبت"><button class="domain-choice" type="button" data-domain="" aria-pressed="true">همه</button><button class="domain-choice" type="button" data-domain="skin" aria-pressed="false">پوست</button><button class="domain-choice" type="button" data-domain="hair" aria-pressed="false">مو</button><button class="domain-choice" type="button" data-domain="beauty" aria-pressed="false">زیبایی</button></div>
+                <p class="muted small">
+                    بدون انتخاب فیلتر هم می‌توانید پیام بفرستید. فقط گزینه‌های مورد نیازتان را
+                    انتخاب کنید.
+                </p>
+                <div class="domain-choices" role="group" aria-label="حوزه مراقبت">
+                    <button class="domain-choice" type="button" data-domain="" aria-pressed="true">
+                        همه
+                    </button>
+                    <button
+                        class="domain-choice"
+                        type="button"
+                        data-domain="skin"
+                        aria-pressed="false"
+                    >
+                        پوست
+                    </button>
+                    <button
+                        class="domain-choice"
+                        type="button"
+                        data-domain="hair"
+                        aria-pressed="false"
+                    >
+                        مو
+                    </button>
+                    <button
+                        class="domain-choice"
+                        type="button"
+                        data-domain="beauty"
+                        aria-pressed="false"
+                    >
+                        زیبایی
+                    </button>
+                </div>
                 <div class="filters-basic">
-                    <div class="field"><label for="category">نوع محصول</label><select id="category"><option value="">همه محصولات</option></select></div>
-                    <div id="skinField" class="field"><label for="skinType">نوع پوست</label><select id="skinType"><option value="">مشخص نشده</option></select></div>
-                    <div id="hairField" class="field"><label for="hairType">نوع مو</label><select id="hairType"><option value="">مشخص نشده</option></select></div>
-                    <div class="field"><label for="maxPrice">حداکثر بودجه <span class="muted">(ریال)</span></label><input id="maxPrice" type="number" min="0" max="1000000000" step="10000" placeholder="مثلاً ۱۵۰۰۰۰۰" inputmode="numeric"><span class="field-hint">قیمت‌ها به ریال هستند، نه تومان.</span></div>
+                    <div class="field">
+                        <label for="category">نوع محصول</label>
+                        <select id="category">
+                            <option value="">همه محصولات</option>
+                        </select>
+                    </div>
+                    <div id="skinField" class="field">
+                        <label for="skinType">نوع پوست</label>
+                        <select id="skinType">
+                            <option value="">مشخص نشده</option>
+                        </select>
+                    </div>
+                    <div id="hairField" class="field">
+                        <label for="hairType">نوع مو</label>
+                        <select id="hairType">
+                            <option value="">مشخص نشده</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="maxPrice">
+                            حداکثر بودجه
+                            <span class="muted">(ریال)</span>
+                        </label>
+                        <input
+                            id="maxPrice"
+                            type="number"
+                            min="0"
+                            max="1000000000"
+                            step="10000"
+                            placeholder="مثلاً ۱۵۰۰۰۰۰"
+                            inputmode="numeric"
+                        />
+                        <span class="field-hint">قیمت‌ها به ریال هستند، نه تومان.</span>
+                    </div>
                 </div>
                 <div class="separator"></div>
                 <details class="advanced-filters">
                     <summary>ترجیحات بیشتر</summary>
-                    <div class="field"><label for="brand">برند</label><select id="brand"><option value="">همه برندها</option></select></div>
-                    <div class="field"><label for="concern">نیاز مراقبتی</label><select id="concern"><option value="">انتخاب نشده</option></select></div>
-                    <div id="shadeField" class="field" hidden><label for="shade">رنگ</label><select id="shade"><option value="">همه رنگ‌ها</option></select></div>
-                    <div id="finishField" class="field" hidden><label for="finish">جلوه آرایش</label><select id="finish"><option value="">همه جلوه‌ها</option></select></div>
-                    <label class="checkbox"><input id="fragranceFree" type="checkbox">فقط محصولات بدون عطر افزوده</label>
-                    <div class="field"><label for="excludedIngredients">ترکیباتی که نمی‌خواهید</label><select id="excludedIngredients" multiple size="4" aria-describedby="ingredientHint"></select><span id="ingredientHint" class="field-hint">در رایانه با Ctrl چند مورد انتخاب کنید. این فیلتر تضمین ایمنی در برابر حساسیت نیست.</span></div>
+                    <div class="field">
+                        <label for="brand">برند</label>
+                        <select id="brand">
+                            <option value="">همه برندها</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="concern">نیاز مراقبتی</label>
+                        <select id="concern">
+                            <option value="">انتخاب نشده</option>
+                        </select>
+                    </div>
+                    <div id="shadeField" class="field" hidden>
+                        <label for="shade">رنگ</label>
+                        <select id="shade">
+                            <option value="">همه رنگ‌ها</option>
+                        </select>
+                    </div>
+                    <div id="finishField" class="field" hidden>
+                        <label for="finish">جلوه آرایش</label>
+                        <select id="finish">
+                            <option value="">همه جلوه‌ها</option>
+                        </select>
+                    </div>
+                    <label class="checkbox">
+                        <input id="fragranceFree" type="checkbox" />
+                        فقط محصولات بدون عطر افزوده
+                    </label>
+                    <div class="field">
+                        <label for="excludedIngredients">ترکیباتی که نمی‌خواهید</label>
+                        <select
+                            id="excludedIngredients"
+                            multiple
+                            size="4"
+                            aria-describedby="ingredientHint"
+                        ></select>
+                        <span id="ingredientHint" class="field-hint">
+                            در رایانه با Ctrl چند مورد انتخاب کنید. این فیلتر تضمین ایمنی در برابر
+                            حساسیت نیست.
+                        </span>
+                    </div>
                 </details>
-                <button id="resetFilters" class="button secondary wide" type="button">پاک کردن ترجیحات</button>
-                <div class="notice" style="margin-top:18px"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#shield" /></svg><span>کاتالوگ ساختگی و مخصوص تست است؛ پیشنهادها برای خرید واقعی یا توصیه پزشکی نیستند.</span></div>
+                <button id="resetFilters" class="button secondary wide" type="button">
+                    پاک کردن ترجیحات
+                </button>
+                <div class="notice" style="margin-top: 18px">
+                    <svg class="icon" aria-hidden="true">
+                        <use href="/assets/icons.svg#shield" />
+                    </svg>
+                    <span>
+                        کاتالوگ ساختگی و مخصوص تست است؛ پیشنهادها برای خرید واقعی یا توصیه پزشکی
+                        نیستند.
+                    </span>
+                </div>
             </div>
         </aside>
         <section class="panel chat-panel" aria-label="گفت‌وگو با دستیار">
-            <div class="chat-header"><div class="assistant-heading"><span class="avatar"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#sparkles" /></svg></span><div><h2>دستیار مراقبت شما</h2><p id="filterSummary">بدون فیلتر · همه محصولات</p></div></div><button id="newChat" class="button secondary" type="button"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#plus" /></svg>گفت‌وگوی جدید</button></div>
+            <div class="chat-header">
+                <div class="assistant-heading">
+                    <span class="avatar">
+                        <svg class="icon" aria-hidden="true">
+                            <use href="/assets/icons.svg#sparkles" />
+                        </svg>
+                    </span>
+                    <div>
+                        <h2>دستیار مراقبت شما</h2>
+                        <p id="filterSummary">بدون فیلتر · همه محصولات</p>
+                    </div>
+                </div>
+                <button id="newChat" class="button secondary" type="button">
+                    <svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#plus" /></svg>
+                    گفت‌وگوی جدید
+                </button>
+            </div>
             <div id="conversation" class="conversation" tabindex="0" aria-label="پیام‌ها">
                 <div id="welcome" class="welcome">
-                    <div class="hero-icon"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#sparkles" /></svg></div><h2>مراقبت بهتر، با یک گفت‌وگو.</h2><p>کافی است نیازتان را بنویسید؛ هیچ فیلتری اجباری نیست.<br>از اطلاعات ثبت‌شده برای پیدا کردن محصول مناسب کمک می‌گیریم.</p>
-                    <div class="example-list"><button class="example-question" data-example="skin" type="button"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#leaf" /></svg><span class="example-label">برای پوست خشک، مرطوب‌کننده ارزان می‌خواهم</span><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#arrow" /></svg></button><button class="example-question" data-example="hair" type="button"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#sparkles" /></svg><span class="example-label">برای موی فر و وز، کرم مو می‌خواهم</span><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#arrow" /></svg></button><button class="example-question" data-example="beauty" type="button"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#layers" /></svg><span class="example-label">یک رژ لب صورتی با جلوه مات می‌خواهم</span><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#arrow" /></svg></button></div>
+                    <div class="hero-icon">
+                        <svg class="icon" aria-hidden="true">
+                            <use href="/assets/icons.svg#sparkles" />
+                        </svg>
+                    </div>
+                    <h2>مراقبت بهتر، با یک گفت‌وگو.</h2>
+                    <p>
+                        کافی است نیازتان را بنویسید؛ هیچ فیلتری اجباری نیست.
+                        <br />
+                        از اطلاعات ثبت‌شده برای پیدا کردن محصول مناسب کمک می‌گیریم.
+                    </p>
+                    <div class="example-list">
+                        <button class="example-question" data-example="skin" type="button">
+                            <svg class="icon" aria-hidden="true">
+                                <use href="/assets/icons.svg#leaf" />
+                            </svg>
+                            <span class="example-label">
+                                برای پوست خشک، مرطوب‌کننده ارزان می‌خواهم
+                            </span>
+                            <svg class="icon" aria-hidden="true">
+                                <use href="/assets/icons.svg#arrow" />
+                            </svg>
+                        </button>
+                        <button class="example-question" data-example="hair" type="button">
+                            <svg class="icon" aria-hidden="true">
+                                <use href="/assets/icons.svg#sparkles" />
+                            </svg>
+                            <span class="example-label">برای موی فر و وز، کرم مو می‌خواهم</span>
+                            <svg class="icon" aria-hidden="true">
+                                <use href="/assets/icons.svg#arrow" />
+                            </svg>
+                        </button>
+                        <button class="example-question" data-example="beauty" type="button">
+                            <svg class="icon" aria-hidden="true">
+                                <use href="/assets/icons.svg#layers" />
+                            </svg>
+                            <span class="example-label">یک رژ لب صورتی با جلوه مات می‌خواهم</span>
+                            <svg class="icon" aria-hidden="true">
+                                <use href="/assets/icons.svg#arrow" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-                <div id="messages" class="message-list" role="log" aria-live="polite" aria-relevant="additions" aria-label="تاریخچه گفت‌وگو"></div>
+                <div
+                    id="messages"
+                    class="message-list"
+                    role="log"
+                    aria-live="polite"
+                    aria-relevant="additions"
+                    aria-label="تاریخچه گفت‌وگو"
+                ></div>
             </div>
-            <form id="chatForm" class="composer" novalidate><label class="sr-only" for="question">پیام شما</label><div class="composer-box"><textarea id="question" rows="2" maxlength="2000" placeholder="مثلاً: برای پوست حساس یک شوینده بدون عطر می‌خواهم…" aria-describedby="composerHint"></textarea><button id="sendMessage" class="button send-button" type="submit" aria-label="ارسال پیام"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#send" /></svg></button></div><div class="composer-footer"><span id="composerHint">Enter برای ارسال · Shift + Enter برای خط جدید</span><span id="characterCount">۰ / ۲۰۰۰</span><button id="cancelSend" type="button" hidden>توقف درخواست</button></div><div id="composerError" class="small" role="alert" style="color:var(--red)" hidden></div></form>
+            <form id="chatForm" class="composer" novalidate>
+                <label class="sr-only" for="question">پیام شما</label>
+                <div class="composer-box">
+                    <textarea
+                        id="question"
+                        rows="2"
+                        maxlength="2000"
+                        placeholder="مثلاً: برای پوست حساس یک شوینده بدون عطر می‌خواهم…"
+                        aria-describedby="composerHint"
+                    ></textarea>
+                    <button
+                        id="sendMessage"
+                        class="button send-button"
+                        type="submit"
+                        aria-label="ارسال پیام"
+                    >
+                        <svg class="icon" aria-hidden="true">
+                            <use href="/assets/icons.svg#send" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="composer-footer">
+                    <span id="composerHint">Enter برای ارسال · Shift + Enter برای خط جدید</span>
+                    <span id="characterCount">۰ / ۲۰۰۰</span>
+                    <button id="cancelSend" type="button" hidden>توقف درخواست</button>
+                </div>
+                <div
+                    id="composerError"
+                    class="small"
+                    role="alert"
+                    style="color: var(--red)"
+                    hidden
+                ></div>
+            </form>
         </section>
     </div>
-    <footer class="page-footer"><span>SkinRag · اطلاعات محصول از کاتالوگ و موجودی فعلی</span><span>با شروع گفت‌وگوی جدید، سابقه این صفحه پاک می‌شود.</span></footer>
+    <footer class="page-footer">
+        <span>SkinRag · اطلاعات محصول از کاتالوگ و موجودی فعلی</span>
+        <span>با شروع گفت‌وگوی جدید، سابقه این صفحه پاک می‌شود.</span>
+    </footer>
 </main>
-<noscript><p class="notice error">برای استفاده از گفت‌وگو، JavaScript مرورگر باید فعال باشد.</p></noscript>
+<noscript>
+    <p class="notice error">برای استفاده از گفت‌وگو، JavaScript مرورگر باید فعال باشد.</p>
+</noscript>
 
 @section Scripts {
     <script src="~/assets/chat.js" asp-append-version="true" defer></script>

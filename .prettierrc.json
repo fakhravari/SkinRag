@@ -1,0 +1,14 @@
+{
+  "tabWidth": 4,
+  "printWidth": 100,
+  "endOfLine": "crlf",
+  "htmlWhitespaceSensitivity": "ignore",
+  "overrides": [
+    {
+      "files": "*.json",
+      "options": {
+        "tabWidth": 2
+      }
+    }
+  ]
+}

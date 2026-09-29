@@ -1,6 +1,6 @@
 # خط پردازش مشاوره
 
-درخواست `POST /api/consultation/ask` از مسیر `InputNormalizer → InputGuard → IntentClassifier → QueryBuilder → ProductRetriever → RecommendationValidator` می‌گذرد. کنترلر فقط `ConsultationService` را صدا می‌زند؛ اتصال SQL در `Infrastructure/Persistence` و قرارداد مدل در `Infrastructure/AI` است. پرامپت‌ها در `Prompts` نگه‌داری می‌شوند.
+درخواست `POST /api/consultation/ask` از مسیر `InputNormalizer → InputGuard → IntentClassifier → QueryBuilder → ProductRetriever → RecommendationValidator` می‌گذرد. کنترلر فقط `ConsultationService` را صدا می‌زند؛ اتصال SQL در `Infrastructure/Persistence` و قرارداد مدل و مخزن محصولات در `Application/Abstractions` است. پرامپت‌ها در `Prompts` نگه‌داری می‌شوند.
 
 ## قرارداد و گفتگو
 
