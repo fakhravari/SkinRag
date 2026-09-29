@@ -40,6 +40,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Currency).HasMaxLength(3).HasDefaultValue("IRR");
             entity.Property(x => x.UsageInstructions).HasMaxLength(2000);
             entity.Property(x => x.SearchKeywords).HasMaxLength(1000);
+            entity.Property(x => x.Image).HasColumnType("nvarchar(max)");
             entity.Property(x => x.UpdatedAtUtc).HasDefaultValueSql("SYSUTCDATETIME()");
             entity.HasOne(x => x.CategoryDetails).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.NoAction);
             entity.HasOne(x => x.BrandDetails).WithMany().HasForeignKey(x => x.BrandId).OnDelete(DeleteBehavior.NoAction);

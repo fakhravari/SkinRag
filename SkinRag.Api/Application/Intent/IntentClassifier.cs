@@ -64,6 +64,14 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
         {
             shortIntent = ConsultationIntent.FollowUp;
         }
+        // Common self-contained Persian product requests should not depend on
+        // the local model's confidence calibration.
+        if (Has(normalized, "پوست خشک")
+            && Has(normalized, "کرم")
+            && Has(normalized, "مرطوب کننده", "مرطوبکننده"))
+        {
+            return new(ConsultationIntent.ProductSearch, 1, "persian-product-rule");
+        }
         if (shortIntent.HasValue)
         {
             return new(context.HasProductContext ? shortIntent.Value : ConsultationIntent.Unclear, 1, "context-rule")

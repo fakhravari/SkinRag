@@ -102,6 +102,7 @@ public sealed record ProductDto(
     string? Description,
     string? Warnings,
     string? UsageInstructions,
+    string? Image,
     string[] Profiles,
     string[] Concerns,
     string[] Ingredients,

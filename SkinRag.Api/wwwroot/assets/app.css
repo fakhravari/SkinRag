@@ -715,6 +715,15 @@ h3 {
     gap: 8px;
     margin-bottom: 9px;
 }
+.product-card-image {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: contain;
+    border-radius: 10px;
+    background: #fff;
+    margin-bottom: 12px;
+}
 .product-id {
     font-size: 13px;
     color: var(--muted);

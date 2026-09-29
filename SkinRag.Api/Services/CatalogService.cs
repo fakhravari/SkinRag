@@ -119,6 +119,7 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory)
             p.Description,
             p.Warnings,
             p.UsageInstructions,
+            p.Image,
             p.ProductProfiles.Select(x => x.Profile.Slug).Order().ToArray(),
             p.ProductConcerns.Select(x => x.Concern.Slug).Order().ToArray(),
             p.ProductIngredients.Select(x => x.Ingredient.Slug).Order().ToArray(),

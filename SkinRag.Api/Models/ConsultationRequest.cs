@@ -10,9 +10,12 @@ public sealed class ConsultationRequest : CatalogFilters
     [MaxLength(2000)]
     public string? Message { get; set; }
     public Guid? ConversationId { get; set; }
+    public bool FiltersOnly { get; set; }
 
     [System.Text.Json.Serialization.JsonIgnore]
-    public string EffectiveQuestion => string.IsNullOrWhiteSpace(Question) ? Message ?? "" : Question;
+    public string EffectiveQuestion => string.IsNullOrWhiteSpace(Question)
+        ? Message ?? (FiltersOnly ? "محصولات مطابق فیلترهای انتخاب‌شده" : "")
+        : Question;
 
     [MaxLength(300)]
     public string? Concern { get; set; }

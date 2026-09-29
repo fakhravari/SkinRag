@@ -55,6 +55,8 @@ IF COL_LENGTH('dbo.Products',
 IF COL_LENGTH('dbo.Products',
     'SearchKeywords') IS NULL ALTER TABLE dbo.Products ADD SearchKeywords NVARCHAR(1000) NULL;
 IF COL_LENGTH('dbo.Products',
+    'Image') IS NULL ALTER TABLE dbo.Products ADD Image NVARCHAR(MAX) NULL;
+IF COL_LENGTH('dbo.Products',
     'IsDemo') IS NULL ALTER TABLE dbo.Products ADD IsDemo BIT NOT NULL CONSTRAINT DF_Products_Demo DEFAULT 0;
 IF COL_LENGTH('dbo.Products',
     'FragranceFree') IS NULL ALTER TABLE dbo.Products ADD FragranceFree BIT NULL;

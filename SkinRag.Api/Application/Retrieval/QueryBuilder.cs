@@ -40,6 +40,9 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         }
 
         var text = PersianText.Normalize(message);
+        var isPersianDrySkinMoisturizer = HasAny(text, "پوست خشک")
+            && HasAny(text, "کرم")
+            && HasAny(text, "مرطوب کننده", "مرطوبکننده");
         var isContextual = decision.Intent == ConsultationIntent.FollowUp
             || HasAny(
             text,
@@ -52,6 +55,9 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             "ترکیباتش",
             "موجوده",
             "ارزان ترش",
+            "ارزان",
+            "ارزون",
+            "اقتصادی",
             "ارزون ترش");
         if (ids.Length == 0 && isContextual && conversation.ProductIds.Length > 0
             && decision.Intent is ConsultationIntent.ProductDetails or ConsultationIntent.ProductComparison or ConsultationIntent.PriceInquiry or ConsultationIntent.AvailabilityInquiry)
@@ -78,8 +84,8 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         if (ids.Length > 0)
         {
             var explicitFilters = CopyFilters(request);
-            explicitFilters.MaxPrice ??= writtenBudget ?? conversation.PendingBudgetRials;
-            return new(
+            ApplyBudget(explicitFilters, budgetInput, conversation.PendingBudgetRials, conversation.PendingMinimumBudgetRials);
+            return CheckBudgetBounds(new(
                 message,
                 explicitFilters,
                 decision.Intent,
@@ -87,27 +93,71 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
                 false,
                 ids,
                 InStockOnly: decision.Intent is not (ConsultationIntent.AvailabilityInquiry or ConsultationIntent.PriceInquiry or ConsultationIntent.ProductDetails or ConsultationIntent.ProductComparison),
-                Source: "product-reference");
+                Source: "product-reference"));
         }
 
         var previous = isContextual ? conversation.SearchQuery ?? conversation.UserQuestions.LastOrDefault() ?? request.History.LastOrDefault(x => x.Role == "user")?.Content : null;
+        if (request.FiltersOnly)
+        {
+            var terms = new List<string>();
+            if (request.Domain is { } selectedDomain)
+                terms.Add(selectedDomain switch { "skin" => "پوست", "hair" => "مو", "beauty" => "زیبایی", _ => "" });
+            if (request.CategorySlug is { } categorySlug && vocabulary.Categories.FirstOrDefault(x => x.Slug == categorySlug) is { } category)
+                terms.Add(category.Name);
+            if (request.SkinType is { } skinType && vocabulary.Profiles.FirstOrDefault(x => x.Slug == skinType) is { } skinProfile)
+                terms.Add(skinProfile.Name);
+            if (request.HairType is { } hairType && vocabulary.Profiles.FirstOrDefault(x => x.Slug == hairType) is { } hairProfile)
+                terms.Add(hairProfile.Name);
+            if (request.BrandSlug is { } brandSlug && vocabulary.Brands.FirstOrDefault(x => x.Slug == brandSlug) is { } brand)
+                terms.Add(brand.Name);
+            if (request.ConcernSlug is { } concernSlug && vocabulary.Concerns.FirstOrDefault(x => x.Slug == concernSlug) is { } concern)
+                terms.Add(concern.Name);
+            if (terms.Count == 0)
+                terms.Add("محصولات مراقبتی");
+
+            var filterCopy = CopyFilters(request);
+            ApplyBudget(filterCopy, budgetInput, conversation.PendingBudgetRials, conversation.PendingMinimumBudgetRials);
+            return CheckBudgetBounds(new(
+                string.Join(" ", terms),
+                filterCopy,
+                ConsultationIntent.ProductSearch,
+                request.ConcernSlug is null ? [] : [request.ConcernSlug],
+                request.MaxPrice.HasValue,
+                [],
+                Source: "filters-only"));
+        }
+
         if (request.CategorySlug is not null
             && (request.SkinType is not null || request.HairType is not null || request.Domain == "beauty"))
         {
             var explicitFilters = CopyFilters(request);
-            explicitFilters.MaxPrice ??= writtenBudget ?? conversation.PendingBudgetRials;
-            return new(
+            ApplyBudget(explicitFilters, budgetInput, conversation.PendingBudgetRials, conversation.PendingMinimumBudgetRials);
+            return CheckBudgetBounds(new(
                 message,
                 explicitFilters,
                 decision.Intent,
                 request.ConcernSlug is null ? [] : [request.ConcernSlug],
                 HasAny(text, "ارزان", "ارزون", "اقتصادی"),
                 [],
-                Source: "explicit-filters");
+                Source: "explicit-filters"));
         }
 
         QueryModelOutput parsed;
         var source = "model";
+        if (isPersianDrySkinMoisturizer)
+        {
+            source = "persian-product-rule";
+            parsed = new()
+            {
+                Query = text,
+                Domain = "skin",
+                SkinType = vocabulary.Profiles.FirstOrDefault(x => x.Kind == "skin" && PersianText.Normalize(x.Name) == "خشک")?.Slug,
+                CategorySlug = vocabulary.Categories.FirstOrDefault(x => x.Slug == "face-moisturizer")?.Slug,
+                PricePreference = HasAny(text, "ارزان", "ارزون", "اقتصادی") ? "budget" : "neutral"
+            };
+        }
+        else
+        {
         try
         {
             parsed = await ExtractModelQueryAsync(request, message, previous, decision, vocabulary, ct);
@@ -132,12 +182,13 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
                 CategorySlug = ExplicitCategory(PersianText.Normalize(fallbackText), domain, vocabulary)
             };
         }
+        }
 
         var filters = MergeFilters(request, parsed, decision, conversation, vocabulary, writtenBudget);
-        if (filters.MinPrice > filters.MaxPrice)
-        {
-            throw new ArgumentException("بودجه نوشته‌شده از حداقل قیمت انتخاب‌شده کمتر است.");
-        }
+        if (budgetInput.MinimumPriceRials is { } writtenMinimum && request.MinPrice is null)
+            filters.MinPrice = writtenMinimum;
+        else
+            filters.MinPrice ??= conversation.PendingMinimumBudgetRials;
 
         var concerns = request.ConcernSlug is not null ? new[] {
             request.ConcernSlug
@@ -148,7 +199,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         // Relative requests seek alternatives, rather than being pinned to the earlier product IDs.
         var budget = parsed.PricePreference == "budget"
             || HasAny(text, "ارزان", "ارزون", "اقتصادی", "ارزان ترش", "ارزون ترش");
-        return new(
+        return CheckBudgetBounds(new(
             parsed.Query,
             filters,
             decision.Intent,
@@ -156,7 +207,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             budget,
             ids,
             InStockOnly: decision.Intent is not (ConsultationIntent.AvailabilityInquiry or ConsultationIntent.PriceInquiry or ConsultationIntent.ProductDetails or ConsultationIntent.ProductComparison),
-            Source: source);
+            Source: source));
     }
 
     public static bool IsValid(QueryModelOutput value, CatalogVocabulary vocabulary)
@@ -224,6 +275,21 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         FragranceFree = f.FragranceFree,
         ExcludeIngredientSlugs = f.ExcludeIngredientSlugs.ToArray()
     };
+
+    private static void ApplyBudget(CatalogFilters filters, ParsedBudget writtenBudget, decimal? pendingBudget, decimal? pendingMinimum)
+    {
+        filters.MinPrice ??= writtenBudget.MinimumPriceRials ?? pendingMinimum;
+        filters.MaxPrice ??= writtenBudget.MaximumPriceRials ?? pendingBudget;
+    }
+
+    private static SearchPlan CheckBudgetBounds(SearchPlan plan) => plan.Filters.MinPrice > plan.Filters.MaxPrice
+        ? plan with
+        {
+            NeedsMoreInformation = true,
+            FollowUpQuestion = "حداقل قیمت از سقف بودجه بیشتر است؛ حداقل قیمت یا سقف بودجه را تغییر می‌دهید؟",
+            Source = "conflicting-price-bounds"
+        }
+        : plan;
     private static bool HasAny(string text, params string[] values) => values.Any(s => (" " + text + " ").Contains(" " + s + " ", StringComparison.Ordinal));
 
     private static int LabelScore(string text, string label)

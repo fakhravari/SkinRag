@@ -36,6 +36,18 @@ internal static class BudgetChecks
                 $"Budget conversion failed: {message}");
         }
 
+        foreach (var (message, minimum, maximum) in new (string, decimal, decimal)[]
+        {
+            ("بین ۲۰۰ تا ۵۰۰ هزار تومان", 2_000_000, 5_000_000),
+            ("از ۲۰۰ هزار تومان تا ۵۰۰ هزار تومان", 2_000_000, 5_000_000),
+            ("بین 1.5 تا 2 میلیون ریال", 1_500_000, 2_000_000)
+        })
+        {
+            var result = BudgetParser.Parse(message);
+            check(result.Status == BudgetStatus.Valid && result.MinimumPriceRials == minimum
+                && result.MaximumPriceRials == maximum, $"Budget range conversion failed: {message}");
+        }
+
         foreach (var text in new[] { "زیر 200 هزار", "بودجه من 200 هزار", "من 200 هزار دارم" })
         {
             check(BudgetParser.Parse(text).Status == BudgetStatus.MissingCurrency,
@@ -65,6 +77,19 @@ internal static class BudgetChecks
             }
         }
 
+        foreach (var text in new[] { "تا 1,00,000 تومان", "تا 1,000.000 تومان" })
+        {
+            try
+            {
+                BudgetParser.Parse(text);
+                throw new InvalidOperationException("Malformed amount accepted: " + text);
+            }
+            catch (ArgumentException)
+            {
+                check(true, "Malformed amount was rejected");
+            }
+        }
+
         var configuration = new ConfigurationBuilder().Build();
         var model = new ProbeOllama();
         var classifier = new IntentClassifier(model, configuration, NullLogger<IntentClassifier>.Instance);
@@ -86,6 +111,16 @@ internal static class BudgetChecks
             store.Read(null), vocabulary, default);
         check(plan.Filters.MaxPrice == 2_000_000 && plan.Query.Length > 0,
             "Rial filter was not passed to product retrieval");
+        var rangePlan = await builder.BuildAsync(new ConsultationRequest { Question = "کرم بین 200 تا 500 هزار تومان" },
+            "کرم بین 200 تا 500 هزار تومان", new(ConsultationIntent.ProductSearch, 1, "test"),
+            store.Read(null), vocabulary, default);
+        check(rangePlan.Filters.MinPrice == 2_000_000 && rangePlan.Filters.MaxPrice == 5_000_000,
+            "Written budget range did not become min/max filters");
+        var conflictPlan = await builder.BuildAsync(new ConsultationRequest { Question = "کرم از 300 هزار تومان" , MinPrice = 4_000_000 },
+            "کرم تا 300 هزار تومان", new(ConsultationIntent.ProductSearch, 1, "test"),
+            store.Read(null), vocabulary, default);
+        check(conflictPlan.NeedsMoreInformation && conflictPlan.Source == "conflicting-price-bounds",
+            "Conflicting price bounds did not ask for clarification");
         var explicitPlan = await builder.BuildAsync(new ConsultationRequest
         {
             Question = "کرم با بودجه 200 هزار تومان",
@@ -122,5 +157,18 @@ internal static class BudgetChecks
         var rialsOnly = await service.AskAsync(new ConsultationRequest { Question = "من 200 هزار ریال دارم" }, default);
         check(rialsOnly.Answer.Contains("200,000 ریال") && store.Read(rialsOnly.ConversationId).PendingBudgetRials == 200_000,
             "Rial budget was multiplied or not stored");
+
+        var rangeOnly = await service.AskAsync(new ConsultationRequest { Question = "بین 200 تا 500 هزار تومان" }, default);
+        var rangeState = store.Read(rangeOnly.ConversationId);
+        check(rangeState.PendingMinimumBudgetRials == 2_000_000 && rangeState.PendingBudgetRials == 5_000_000,
+            "Budget-only range was not retained for the next product request");
+
+        var explicitBudget = await service.AskAsync(new ConsultationRequest
+        {
+            Question = "بودجه 200 هزار تومان و سقف 300 هزار تومان",
+            MaxPrice = 4_000_000
+        }, default);
+        check(store.Read(explicitBudget.ConversationId).PendingBudgetRials == 4_000_000,
+            "Explicit UI budget did not override ambiguous amounts in a budget-only message");
     }
 }

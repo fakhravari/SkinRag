@@ -37,7 +37,7 @@ public sealed class ConsultationService(
         }
 
         var state = conversations.Read(request.ConversationId);
-        if (ConversationStore.IsRepeated(state, message))
+        if (!request.FiltersOnly && ConversationStore.IsRepeated(state, message))
         {
             throw new InputRejectedException("REPEATED_MESSAGE", "این پیام چند بار تکرار شده است؛ کمی صبر کنید یا پرسش را تغییر دهید.");
         }
@@ -50,7 +50,15 @@ public sealed class ConsultationService(
         var recentMessages = state.RecentUserMessages.Length > 0 ? state.RecentUserMessages : clientMessages;
         var intentContext = new IntentContext(recentMessages, state.UserQuestions,
             state.UserQuestions.Length > 0 || state.ProductIds.Length > 0);
-        var intent = await classifier.ClassifyAsync(message, intentContext, ct);
+        var intent = request.FiltersOnly
+            ? new IntentDecision(ConsultationIntent.ProductSearch, 1, "filters-only")
+            : await classifier.ClassifyAsync(message, intentContext, ct);
+        if (intent.Intent == ConsultationIntent.Unclear
+            && HasCatalogSelection(request)
+            && IsRecommendationRequest(message))
+        {
+            intent = new(ConsultationIntent.ProductSearch, 1, "catalog-filter-rule");
+        }
         logger.LogInformation("Intent {Intent} ({Source}), confidence {Confidence:F2}, topic {Topic}, requires context {RequiresContext}",
             intent.Code, intent.Source, intent.Confidence, intent.ConversationTopic, intent.RequiresContext);
         ConsultationResponse Direct(string answer, string mode, bool more = false, string? followUp = null, string? notice = null) => new(
@@ -83,12 +91,24 @@ public sealed class ConsultationService(
 
             var clarification = ConversationReplies.ClarificationFor(intent.Clarification);
             var budget = BudgetParser.Parse(message);
-            if (budget.IsBudgetOnly && budget.MaximumPriceRials is { } maximumPrice
-                && intent.Intent == ConsultationIntent.Unclear && intent.Clarification == ClarificationKind.ProductType)
+            var budgetNeedsProductClarification = intent.Clarification is
+                ClarificationKind.ProductType or ClarificationKind.BudgetCurrency or ClarificationKind.BudgetAmount;
+            if (budget.IsBudgetOnly && (budget.MaximumPriceRials.HasValue || request.MaxPrice.HasValue)
+                && intent.Intent == ConsultationIntent.Unclear && budgetNeedsProductClarification)
             {
-                maximumPrice = request.MaxPrice ?? maximumPrice;
-                conversations.SaveBudget(state, message, maximumPrice);
-                var confirmation = $"بودجه شما {maximumPrice.ToString("N0", CultureInfo.InvariantCulture)} ریال در نظر گرفته شد.\n{clarification}";
+                var maximumPrice = request.MaxPrice ?? budget.MaximumPriceRials!.Value;
+                var minimumPrice = request.MinPrice ?? budget.MinimumPriceRials;
+                if (minimumPrice is { } minimumValue && minimumValue > maximumPrice)
+                {
+                    var boundsQuestion = "حداقل قیمت از سقف بودجهٔ انتخاب‌شده بیشتر است؛ حداقل قیمت یا سقف بودجه را تغییر می‌دهید؟";
+                    return Direct(boundsQuestion, "clarification", true, boundsQuestion);
+                }
+
+                conversations.SaveBudget(state, message, maximumPrice, minimumPrice);
+                var rangeText = minimumPrice is { } minimumForDisplay
+                    ? $"بین {minimumForDisplay.ToString("N0", CultureInfo.InvariantCulture)} تا {maximumPrice.ToString("N0", CultureInfo.InvariantCulture)} ریال"
+                    : $"{maximumPrice.ToString("N0", CultureInfo.InvariantCulture)} ریال";
+                var confirmation = $"بودجه شما {rangeText} در نظر گرفته شد.\n{clarification}";
                 return Direct(confirmation, "clarification", true, clarification);
             }
 
@@ -231,5 +251,31 @@ public sealed class ConsultationService(
             },
             ConsultationSchema.Create(context),
             new("Consultation", configuration.GetValue("Consultation:AnswerTimeoutSeconds", 60), configuration.GetValue("Consultation:AnswerMaxTokens", 160)), ct);
+    }
+
+    private static bool HasCatalogSelection(ConsultationRequest request) =>
+        request.CategorySlug is not null
+        || request.BrandSlug is not null
+        || request.SkinType is not null
+        || request.HairType is not null
+        || request.ConcernSlug is not null
+        || request.MaxPrice.HasValue
+        || request.MinPrice.HasValue
+        || request.Shade is not null
+        || request.Finish is not null
+        || request.SizeValue.HasValue
+        || request.FragranceFree.HasValue
+        || request.ExcludeIngredientSlugs.Length > 0;
+
+    private static bool IsRecommendationRequest(string message)
+    {
+        var text = SkinRag.Api.Infrastructure.PersianText.Normalize(message);
+        return text.Contains("معرفی", StringComparison.Ordinal)
+            || text.Contains("پیشنهاد", StringComparison.Ordinal)
+            || text.Contains("نشون بده", StringComparison.Ordinal)
+            || text.Contains("نشان بده", StringComparison.Ordinal)
+            || text.Contains("پیدا کن", StringComparison.Ordinal)
+            || text.Contains("میخوام", StringComparison.Ordinal)
+            || text.Contains("میخواهم", StringComparison.Ordinal);
     }
 }

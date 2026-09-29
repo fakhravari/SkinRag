@@ -11,6 +11,7 @@ public sealed record ConversationState(Guid Id, string[] UserQuestions, int[] Pr
     public CatalogFilters? SearchFilters { get; init; }
     public string[] RecentUserMessages { get; init; } = [];
     public decimal? PendingBudgetRials { get; init; }
+    public decimal? PendingMinimumBudgetRials { get; init; }
 }
 
 // Product references come only from validated server results, never client assistant history.
@@ -27,6 +28,7 @@ public sealed class ConversationStore : IDisposable
             UserQuestions = previous.UserQuestions.Append(question).TakeLast(4).ToArray(),
             RecentUserMessages = previous.RecentUserMessages.Append(question).TakeLast(4).ToArray(),
             PendingBudgetRials = null,
+            PendingMinimumBudgetRials = null,
             ProductIds = ids.Distinct().Take(10).ToArray(),
             UpdatedAtUtc = DateTime.UtcNow,
             SearchQuery = plan?.Intent is ConsultationIntent.ProductSearch or ConsultationIntent.SkinConsultation or ConsultationIntent.RoutineRecommendation or ConsultationIntent.FollowUp ? plan.Query : previous.SearchQuery,
@@ -44,11 +46,12 @@ public sealed class ConversationStore : IDisposable
         });
     }
 
-    public void SaveBudget(ConversationState previous, string message, decimal maximumPriceRials)
+    public void SaveBudget(ConversationState previous, string message, decimal maximumPriceRials, decimal? minimumPriceRials = null)
     {
         Store(previous with
         {
             PendingBudgetRials = maximumPriceRials,
+            PendingMinimumBudgetRials = minimumPriceRials,
             RecentUserMessages = previous.RecentUserMessages.Append(message).TakeLast(4).ToArray(),
             UpdatedAtUtc = DateTime.UtcNow
         });

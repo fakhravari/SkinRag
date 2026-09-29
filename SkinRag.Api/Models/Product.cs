@@ -20,6 +20,7 @@ public sealed class Product
     public string? HairTypes { get; set; }
     public string? UsageInstructions { get; set; }
     public string? SearchKeywords { get; set; }
+    public string? Image { get; set; }
     public bool IsDemo { get; set; }
     public bool? FragranceFree { get; set; }
     public string Currency { get; set; } = "IRR";

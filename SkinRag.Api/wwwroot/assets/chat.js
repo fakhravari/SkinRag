@@ -242,6 +242,14 @@
             return request;
         }
 
+        function hasSelectedFilters(request) {
+            return [
+                "domain", "categorySlug", "brandSlug", "concernSlug", "skinType", "hairType",
+                "minPrice", "maxPrice", "shade", "finish", "sizeValue", "sizeUnit", "fragranceFree",
+            ].some(function (key) { return request[key] !== undefined; })
+                || request.excludeIngredientSlugs.length > 0;
+        }
+
         function addMessage(role, text, options) {
             options = options || {};
             $("#welcome").prop("hidden", true);
@@ -293,6 +301,14 @@
                     );
                 $card.append(
                     $top,
+                    p.image
+                        ? $("<img>")
+                              .addClass("product-card-image")
+                              .attr("src", p.image)
+                              .attr("alt", p.name)
+                              .attr("loading", "lazy")
+                              .on("error", function () { $(this).remove(); })
+                        : null,
                     $("<h3>").text(p.name),
                     $("<p>")
                         .addClass("product-brand")
@@ -356,19 +372,26 @@
             var question = $question.val().trim(),
                 request;
             showComposerError("");
-            if (question.length < 1 || question.length > 2000) {
-                showComposerError("پیام باید بین ۱ تا ۲۰۰۰ نویسه باشد.");
+            if (question.length > 2000) {
+                showComposerError("پیام باید حداکثر ۲۰۰۰ نویسه باشد.");
                 $question.trigger("focus");
                 return;
             }
             try {
                 request = readRequest(question);
+                if (!question) {
+                    if (!hasSelectedFilters(request)) {
+                        showComposerError("ابتدا دست‌کم یک فیلتر انتخاب کنید یا پیام بنویسید.");
+                        return;
+                    }
+                    request.filtersOnly = true;
+                }
             } catch (error) {
                 showComposerError(error.message);
                 return;
             }
             request.conversationId = conversationId;
-            addMessage("user", question, { filter: $("#filterSummary").text() });
+            addMessage("user", question || "جست‌وجو بر اساس فیلترهای انتخاب‌شده", { filter: $("#filterSummary").text() });
             var $thinking = addMessage("assistant", "");
             $thinking
                 .find(".message-bubble")
@@ -510,6 +533,9 @@
             $("#maxPrice").val("");
             $("#fragranceFree").prop("checked", false);
             setDomain(null, false);
+        });
+        $("#applyFilters").on("click", function () {
+            $("#chatForm").trigger("submit");
         });
         $(".example-question").on("click", function () {
             if (busy) return;
