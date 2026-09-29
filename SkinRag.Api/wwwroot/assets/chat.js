@@ -1,7 +1,7 @@
 (function ($, app) {
   "use strict";
   $(function () {
-    var taxonomy = null, ingredientNames = new Map(), domain = null, history = [], pendingRequest = null;
+    var taxonomy = null, ingredientNames = new Map(), domain = null, history = [], conversationId = null, pendingRequest = null;
     var indexReady = false, filtersReady = false, busy = false, statusRequest = null, filtersRequest = null, statusTimer = null;
     var $question = $("#question"), $messages = $("#messages"), $conversation = $("#conversation");
 
@@ -161,7 +161,8 @@
         $details.append($("<p>").text("ترکیبات ثبت‌شده: " + (ingredients.join("، ") || "فهرست ساختاریافته ثبت نشده است.")));
         if (p.usageInstructions) $details.append($("<p>").text("روش استفاده: " + p.usageInstructions));
         if (p.warnings) $details.append($("<p>").text(p.warnings));
-        if (p.isDemo) $details.append($("<p>").text("محصول و اطلاعات آن ساختگی و آزمایشی است."));
+        if (p.isDemo) $details.append($("<p>").text("قیمت و مشخصات این رکورد هنوز با اطلاعات فروشنده تأیید نشده‌اند."));
+        if (match.reason) $details.append($("<p>").text(match.reason));
         $card.append($details);
         $grid.append($card);
       });
@@ -174,8 +175,9 @@
       if (busy) return;
       var question = $question.val().trim(), request;
       showComposerError("");
-      if (question.length < 3 || question.length > 2000) { showComposerError("پیام باید بین ۳ تا ۲۰۰۰ نویسه باشد."); $question.trigger("focus"); return; }
+      if (question.length < 1 || question.length > 2000) { showComposerError("پیام باید بین ۱ تا ۲۰۰۰ نویسه باشد."); $question.trigger("focus"); return; }
       try { request = readRequest(question); } catch (error) { showComposerError(error.message); return; }
+      request.conversationId = conversationId;
       addMessage("user", question, { filter: $("#filterSummary").text() });
       var $thinking = addMessage("assistant", "");
       $thinking.find(".message-bubble").append($("<div>").addClass("thinking")
@@ -195,10 +197,11 @@
         $question.trigger("focus");
       }
       pendingRequest = app.request("/api/consultation/ask", {
-        method: "POST", contentType: "application/json; charset=utf-8", data: JSON.stringify(request), timeout: 100000
+        method: "POST", contentType: "application/json; charset=utf-8", data: JSON.stringify(request), timeout: 230000
       }).done(function (response) {
         try {
           if (!response || typeof response.answer !== "string" || !Array.isArray(response.products)) throw new Error("Invalid response");
+          conversationId = response.conversationId || conversationId;
           $thinking.find(".message-bubble").empty().text(response.answer);
           if (response.notice) $thinking.append($("<p>").addClass("notice info message-notice").text(response.notice));
           renderProducts($thinking, response);
@@ -230,6 +233,7 @@
     $("#newChat").on("click", function () {
       if (busy) return;
       history = [];
+      conversationId = null;
       $messages.empty();
       $("#welcome").prop("hidden", false);
       $question.val("").trigger("input").trigger("focus");

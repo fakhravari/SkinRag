@@ -71,7 +71,7 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory)
             price, p.Currency, stock, p.IsDemo, p.FragranceFree, p.SkinTypes, p.HairTypes, p.Description, p.Warnings,
             p.UsageInstructions, p.ProductProfiles.Select(x => x.Profile.Slug).Order().ToArray(),
             p.ProductConcerns.Select(x => x.Concern.Slug).Order().ToArray(),
-            p.ProductIngredients.Select(x => x.Ingredient.Slug).Order().ToArray(), variants);
+            p.ProductIngredients.Select(x => x.Ingredient.Slug).Order().ToArray(), variants, p.Ingredients, p.Concerns);
     }
 
     public static async Task ValidateFiltersAsync(AppDbContext db, CatalogFilters f, CancellationToken ct)

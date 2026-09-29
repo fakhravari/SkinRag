@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using SkinRag.Api.Services;
+using SkinRag.Api.Application.Validation;
 
 namespace SkinRag.Api.Infrastructure;
 
@@ -25,7 +26,8 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
         await context.Response.WriteAsJsonAsync(new ProblemDetails
         {
             Status = status, Title = title, Instance = context.Request.Path,
-            Extensions = { ["traceId"] = context.TraceIdentifier }
+            Extensions = { ["traceId"] = context.TraceIdentifier,
+                ["code"] = exception is InputRejectedException input ? input.Code : null }
         }, cancellationToken: ct);
         return true;
     }

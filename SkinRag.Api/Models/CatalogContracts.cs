@@ -44,7 +44,7 @@ public sealed record ProductDto(int Id, string? Sku, string Name, string? Brand,
     string? Category, string? CategorySlug, string? Domain, decimal? Price, string Currency, int StockQuantity,
     bool IsDemo, bool? FragranceFree, string? SkinTypes, string? HairTypes, string? Description, string? Warnings,
     string? UsageInstructions, string[] Profiles, string[] Concerns, string[] Ingredients,
-    IReadOnlyList<VariantDto> Variants);
+    IReadOnlyList<VariantDto> Variants, string? IngredientsText = null, string? ConcernsText = null);
 
 public sealed record ProductMatch(ProductDto Product, double Similarity, double Score, string? Reason = null);
 public sealed record ProductRecommendation(int ProductId, string Reason);

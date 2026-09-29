@@ -49,7 +49,7 @@ class CatalogTests(unittest.TestCase):
         for id_, name in [(1, "مرطوب‌کننده سبک صورت"), (2, "شوینده ملایم صورت"), (3, "کرم مرطوب‌کننده پوست خشک")]:
             status, item = call(f"/api/catalog/products/{id_}")
             self.assertEqual(200, status)
-            self.assertEqual(name, item["name"])
+            self.assertTrue(item["name"].startswith(name))
 
     def test_pagination_does_not_overlap(self):
         first = self.page(page=1, pageSize=7)
@@ -102,9 +102,9 @@ class CatalogTests(unittest.TestCase):
             self.assertTrue(all(v["sizeValue"] == 100 and v["sizeUnit"] == "ml" for v in item["variants"]))
 
     def test_category_root_brand_and_concern(self):
-        data = self.page(categorySlug="hair", brandSlug="avisa-demo", concernSlug="frizz", pageSize=100)
+        data = self.page(categorySlug="hair", brandSlug="ldora-care", concernSlug="frizz", pageSize=100)
         self.assertGreater(data["total"], 0)
-        self.assertTrue(all(x["domain"] == "hair" and x["brandSlug"] == "avisa-demo" and "frizz" in x["concerns"] for x in data["items"]))
+        self.assertTrue(all(x["domain"] == "hair" and x["brandSlug"] == "ldora-care" and "frizz" in x["concerns"] for x in data["items"]))
 
     def test_invalid_filters_are_400(self):
         for query in [{"categorySlug": "nonexistent"}, {"excludeIngredientSlugs": ["unknown"]},

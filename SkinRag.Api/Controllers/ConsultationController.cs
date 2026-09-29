@@ -1,13 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using SkinRag.Api.Models;
-using SkinRag.Api.Services;
+using SkinRag.Api.Application.Consultation;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace SkinRag.Api.Controllers;
 
 [ApiController]
 [Route("api/consultation")]
-public sealed class ConsultationController(RagService ragService) : ControllerBase
+public sealed class ConsultationController(ConsultationService consultationService) : ControllerBase
 {
     [HttpPost("ask")]
     [EnableRateLimiting("consultation")]
@@ -17,7 +17,7 @@ public sealed class ConsultationController(RagService ragService) : ControllerBa
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
 
-        var result = await ragService.AskAsync(request, cancellationToken);
+        var result = await consultationService.AskAsync(request, cancellationToken);
         return Ok(result);
     }
 }

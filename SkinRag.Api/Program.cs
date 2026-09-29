@@ -3,6 +3,12 @@ using SkinRag.Api.Data;
 using SkinRag.Api.Services;
 using SkinRag.Api.Infrastructure;
 using System.Threading.RateLimiting;
+using SkinRag.Api.Application.Consultation;
+using SkinRag.Api.Application.Intent;
+using SkinRag.Api.Application.Retrieval;
+using SkinRag.Api.Application.Validation;
+using SkinRag.Api.Infrastructure.AI;
+using SkinRag.Api.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,9 +37,17 @@ builder.Services.AddHttpClient("Ollama", client =>
 
 builder.Services.AddSingleton<KnowledgeIndexService>();
 builder.Services.AddSingleton<OllamaClient>();
+builder.Services.AddSingleton<IOllamaClient>(sp => sp.GetRequiredService<OllamaClient>());
 builder.Services.AddHostedService<KnowledgeIndexWorker>();
 builder.Services.AddScoped<CatalogService>();
-builder.Services.AddScoped<RagService>();
+builder.Services.AddSingleton<ConversationStore>();
+builder.Services.AddSingleton<InputGuard>();
+builder.Services.AddScoped<IIntentClassifier, IntentClassifier>();
+builder.Services.AddScoped<IQueryBuilder, QueryBuilder>();
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<IProductRetriever, ProductRetriever>();
+builder.Services.AddScoped<RecommendationValidator>();
+builder.Services.AddScoped<ConsultationService>();
 
 var app = builder.Build();
 app.UseExceptionHandler();

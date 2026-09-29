@@ -5,7 +5,7 @@ using SkinRag.Api.Infrastructure.AI;
 
 namespace SkinRag.Api.Services;
 
-public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfiguration configuration) : IOllamaClient
+public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfiguration configuration, ILogger<OllamaClient> logger) : IOllamaClient
 {
     public static readonly JsonSerializerOptions StructuredJsonOptions = new()
     {
@@ -61,10 +61,12 @@ public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfigur
             {
                 model,
                 stream = false,
+                keep_alive = "30m",
                 format = schema,
                 messages = new[]
                 {
-                    new { role = "system", content = systemPrompt + "\nOutput JSON schema:\n" + schema.GetRawText() },
+                    new { role = "system", content = systemPrompt + "\nReturn JSON with these fields: " +
+                        string.Join(", ", schema.GetProperty("properties").EnumerateObject().Select(p => p.Name)) },
                     new { role = "user", content = JsonSerializer.Serialize(input, StructuredJsonOptions) }
                 },
                 options = new
@@ -77,11 +79,14 @@ public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfigur
             cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        var result = await response.Content.ReadFromJsonAsync<ChatResponse>(
-            cancellationToken: cancellationToken);
+        ChatResponse? result;
+        try { result = await response.Content.ReadFromJsonAsync<ChatResponse>(cancellationToken: cancellationToken); }
+        catch (JsonException) { throw new InvalidModelOutputException("Ollama returned an invalid chat response envelope."); }
 
         if (string.IsNullOrWhiteSpace(result?.Message?.Content) || result.Message.Content.Length > 16000)
             throw new InvalidModelOutputException("Ollama returned empty or oversized JSON.");
+        logger.LogInformation("Ollama {Stage}: {Tokens} input tokens, {Seconds:F1}s, load {LoadSeconds:F1}s",
+            options.Stage, result.PromptTokens, result.TotalDuration / 1e9, result.LoadDuration / 1e9);
         return ParseStructured<T>(result.Message.Content);
     }
 
@@ -126,6 +131,9 @@ public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfigur
     {
         [JsonPropertyName("message")]
         public ChatMessage? Message { get; set; }
+        [JsonPropertyName("total_duration")] public long TotalDuration { get; set; }
+        [JsonPropertyName("load_duration")] public long LoadDuration { get; set; }
+        [JsonPropertyName("prompt_eval_count")] public int PromptTokens { get; set; }
     }
 
     private sealed class ChatMessage
