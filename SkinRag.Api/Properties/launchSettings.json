@@ -1,0 +1,13 @@
+{
+  "profiles": {
+    "SkinRag.Api": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "chat",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:63838;http://localhost:63839"
+    }
+  }
+}
