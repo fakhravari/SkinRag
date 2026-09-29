@@ -460,6 +460,7 @@ for (var i = 0; i < 3; i++)
 
 Check(ConversationStore.IsRepeated(repeatState, "کرم"), "Repeated-message guard failed");
 await IntentChecks.RunAsync(Check);
+await BudgetChecks.RunAsync(Check);
 Console.WriteLine($"{checks} checks passed. Social intent, routing, query contracts, JSON, live-stock/price validation, conversation and fallback verified.");
 if (args.Contains("--intent-live"))
 {

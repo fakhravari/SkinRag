@@ -31,7 +31,7 @@ public static partial class BudgetParser
 
     private const string Amount = @"(?<amount>[+-]?[0-9]+(?:[.,٫٬][0-9]+)*)\s*(?<scale>هزار|میلیون|میلیارد)?\s*(?<currency>تومان|تومن|ریال)?(?![\p{L}\p{N}])";
 
-    [GeneratedRegex(@"(?<![\p{L}\p{N}])(?:تا|زیر|حداکثر|بودجه(?:\s+(?:من|ام))?(?:\s+(?:تا|است|هست|حدود))?|سقف(?:\s+قیمت)?|با(?:\s+بودجه)?)\s*(?:قیمت\s*)?" + Amount)]
+    [GeneratedRegex(@"(?<![\p{L}\p{N}])(?:تا|زیر|حداکثر|بودجه(?:\s+(?:من|ام))?(?:\s+(?:تا|است|هست|حدود))?|سقف(?:\s+قیمت)?|با\s+بودجه)\s*(?:قیمت\s*)?" + Amount)]
     private static partial Regex BudgetLimit();
 
     [GeneratedRegex(@"(?<![\p{L}\p{N}])من\s+(?:(?:فقط|حدود|تقریبا)\s+)*" + Amount + @"\s*(?:پول\s+)?دارم\b")]
