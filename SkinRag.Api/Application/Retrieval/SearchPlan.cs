@@ -20,7 +20,9 @@ public sealed record CatalogVocabulary(
     Brand[] Brands,
     Profile[] Profiles,
     Concern[] Concerns,
-    Ingredient[] Ingredients);
+    Ingredient[] Ingredients,
+    string[]? Shades = null,
+    string[]? Finishes = null);
 
 public sealed record RetrievalResult(
     IReadOnlyList<ProductMatch> Products,

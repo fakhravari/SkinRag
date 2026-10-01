@@ -170,16 +170,17 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
                 ex.GetType().Name);
             source = "explicit-filters";
             var fallbackText = previous is null ? message : previous + " " + message;
-            var domain = request.Domain ?? ScopeDomain(fallbackText);
-            var profileMatches = vocabulary.Profiles.Where(x => (domain is null || x.Kind == domain) && LabelScore(PersianText.Normalize(fallbackText), x.Name) > 0)
+            var fallbackSearchText = $"{fallbackText} {CustomerLanguageQuery.ExpandTerms(fallbackText)}";
+            var domain = request.Domain ?? ScopeDomain(fallbackSearchText);
+            var profileMatches = vocabulary.Profiles.Where(x => (domain is null || x.Kind == domain) && LabelScore(PersianText.Normalize(fallbackSearchText), x.Name) > 0)
                 .ToArray();
             parsed = new()
             {
-                Query = fallbackText[..Math.Min(500, fallbackText.Length)],
+                Query = fallbackSearchText[..Math.Min(500, fallbackSearchText.Length)],
                 Domain = domain,
                 SkinType = profileMatches.Length == 1 && profileMatches[0].Kind == "skin" ? profileMatches[0].Slug : null,
                 HairType = profileMatches.Length == 1 && profileMatches[0].Kind == "hair" ? profileMatches[0].Slug : null,
-                CategorySlug = ExplicitCategory(PersianText.Normalize(fallbackText), domain, vocabulary)
+                CategorySlug = ExplicitCategory(PersianText.Normalize(fallbackSearchText), domain, vocabulary)
             };
         }
         }
@@ -200,7 +201,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         var budget = parsed.PricePreference == "budget"
             || HasAny(text, "ارزان", "ارزون", "اقتصادی", "ارزان ترش", "ارزون ترش");
         return CheckBudgetBounds(new(
-            parsed.Query,
+            CustomerLanguageQuery.AppendCatalogTerms(parsed.Query, message),
             filters,
             decision.Intent,
             concerns,
@@ -242,6 +243,16 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         }
 
         if (value.BrandSlug is not null && !vocabulary.Brands.Any(x => x.Slug == value.BrandSlug))
+        {
+            return false;
+        }
+
+        if (value.Shade is not null && !(vocabulary.Shades ?? []).Contains(value.Shade, StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        if (value.Finish is not null && !(vocabulary.Finishes ?? []).Contains(value.Finish, StringComparer.Ordinal))
         {
             return false;
         }
@@ -304,8 +315,11 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
     private static string? ScopeDomain(string message)
     {
         var text = PersianText.Normalize(message);
-        var hair = HasAny(text, "مو", "موی", "موهام", "موها", "شامپو", "نرم کننده", "کراتین");
-        var beauty = HasAny(text, "رژ", "ریمل", "کانسیلر", "سایه", "خط چشم", "کرم پودر", "لاک", "رژگونه");
+        var hair = HasAny(text, "مو", "موی", "موهام", "موها", "شامپو", "نرم کننده", "کراتین", "روغن مو", "سرم مو", "ماسک مو", "موس مو");
+        var beauty = HasAny(
+            text,
+            "رژ", "ریمل", "کانسیلر", "سایه", "خط چشم", "کرم پودر", "لاک", "رژگونه", "برنزر", "برانزر",
+            "برق لب", "لیپ گلاس", "بی بی کرم", "پرایمر", "پنکیک", "مداد ابرو", "هایلایتر", "آی لاینر", "فاندیشن");
         var skin = HasAny(
             text,
             "پوست",
@@ -316,7 +330,12 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             "مرطوب کننده",
             "شوینده",
             "صورت",
-            "شامپو بدن");
+            "شامپو بدن",
+            "بدن",
+            "دست",
+            "بالم لب",
+            "میسلار",
+            "لوسیون");
         if (text.Contains("شامپو بدن"))
         {
             hair = false;
@@ -343,7 +362,17 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             "beauty" when HasAny(text, "ریمل") => "mascara",
             _ => null
         };
-        return vocabulary.Categories.Any(x => x.Slug == slug) ? slug : null;
+        if (vocabulary.Categories.Any(x => x.Slug == slug))
+        {
+            return slug;
+        }
+
+        return vocabulary.Categories
+            .Select(x => new { x.Slug, Score = LabelScore(text, x.Name) })
+            .Where(x => x.Score > 0)
+            .OrderByDescending(x => x.Score)
+            .Select(x => x.Slug)
+            .FirstOrDefault();
     }
 
     private async Task<QueryModelOutput> ExtractModelQueryAsync(
@@ -356,8 +385,10 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
     {
         // Keep extraction context small enough for the configured local model window.
         // This narrows the vocabulary only; an inferred scope is not a hard SQL filter.
-        var scope = request.Domain ?? ScopeDomain(message + " " + previous);
-        var searchText = PersianText.Normalize(message + " " + previous);
+        var customerLanguageTerms = CustomerLanguageQuery.ExpandTerms(message);
+        var scopeText = $"{message} {previous} {customerLanguageTerms}";
+        var scope = request.Domain ?? ScopeDomain(scopeText);
+        var searchText = PersianText.Normalize(scopeText);
         var scoped = vocabulary with
         {
             Categories = vocabulary.Categories.Where(x => scope is null || x.Domain == scope).Select(x => new
@@ -410,6 +441,8 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             ["hairType"] = PipelinePrompts.NullableEnum(scoped.Profiles.Where(x => x.Kind == "hair").Select(x => x.Slug)),
             ["categorySlug"] = PipelinePrompts.NullableEnum(scoped.Categories.Select(x => x.Slug)),
             ["brandSlug"] = PipelinePrompts.NullableEnum(scoped.Brands.Select(x => x.Slug)),
+            ["shade"] = PipelinePrompts.NullableEnum(vocabulary.Shades ?? []),
+            ["finish"] = PipelinePrompts.NullableEnum(vocabulary.Finishes ?? []),
             ["concernSlugs"] = SlugArray(scoped.Concerns.Select(x => x.Slug), Math.Min(3, scoped.Concerns.Length)),
             ["excludeIngredientSlugs"] = SlugArray(scoped.Ingredients.Select(x => x.Slug), Math.Min(20, scoped.Ingredients.Length)),
             ["fragranceFree"] = new
@@ -440,10 +473,13 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             new
             {
                 message,
+                customerLanguageTerms,
                 intent = decision.Code,
                 previousUserQuestion = previous,
                 categories = scoped.Categories.Select(x => new[] { x.Slug, x.Name, x.Domain }),
                 brands = scoped.Brands.Select(x => new[] { x.Slug, x.Name }),
+                shades = vocabulary.Shades ?? [],
+                finishes = vocabulary.Finishes ?? [],
                 profiles = scoped.Profiles.Select(x => new[] { x.Slug, x.Name, x.Kind }),
                 concerns = scoped.Concerns.Select(x => new[] { x.Slug, x.Name }),
                 ingredients = scoped.Ingredients.Select(x => new[] { x.Slug, x.Name })
@@ -482,6 +518,8 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         filters.SkinType ??= filters.Domain is null or "skin" ? parsed.SkinType : null;
         filters.HairType ??= filters.Domain is null or "hair" ? parsed.HairType : null;
         filters.BrandSlug ??= parsed.BrandSlug;
+        filters.Shade ??= parsed.Shade;
+        filters.Finish ??= parsed.Finish;
         filters.FragranceFree ??= parsed.FragranceFree;
         filters.MaxPrice ??= writtenBudget ?? conversation.PendingBudgetRials;
         filters.ExcludeIngredientSlugs = filters.ExcludeIngredientSlugs.Concat(parsed.ExcludeIngredientSlugs).Distinct().ToArray();

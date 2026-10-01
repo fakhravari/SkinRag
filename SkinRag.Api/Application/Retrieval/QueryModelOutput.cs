@@ -23,6 +23,12 @@ public sealed class QueryModelOutput
     public string? BrandSlug { get; init; }
 
     [JsonRequired]
+    public string? Shade { get; init; }
+
+    [JsonRequired]
+    public string? Finish { get; init; }
+
+    [JsonRequired]
     public string[] ConcernSlugs { get; init; } = [];
 
     [JsonRequired]

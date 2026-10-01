@@ -17,7 +17,9 @@ public sealed class ProductRepository(IDbContextFactory<AppDbContext> factory) :
             await db.Brands.AsNoTracking().ToArrayAsync(ct),
             await db.Profiles.AsNoTracking().ToArrayAsync(ct),
             await db.Concerns.AsNoTracking().ToArrayAsync(ct),
-            await db.Ingredients.AsNoTracking().ToArrayAsync(ct));
+            await db.Ingredients.AsNoTracking().ToArrayAsync(ct),
+            await db.Products.AsNoTracking().Where(x => x.IsActive).SelectMany(x => x.Variants).Where(x => x.IsActive && x.Shade != null).Select(x => x.Shade!).Distinct().ToArrayAsync(ct),
+            await db.Products.AsNoTracking().Where(x => x.IsActive).SelectMany(x => x.Variants).Where(x => x.IsActive && x.Finish != null).Select(x => x.Finish!).Distinct().ToArrayAsync(ct));
     }
 
     private static IQueryable<Product> Query(AppDbContext db, SearchPlan plan)

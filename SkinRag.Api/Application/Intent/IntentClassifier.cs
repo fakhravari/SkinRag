@@ -19,13 +19,23 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
     // Match product domains instead of maintaining a growing list of individual SKUs or categories.
     private static readonly string[] ProductDomainTerms =
     [
-        "پوست", "مو", "صورت", "لب", "چشم", "ناخن", "آرایش", "آرایشی", "زیبایی", "بهداشتی", "مراقبتی"
+        "پوست", "مو", "صورت", "لب", "چشم", "مژه", "ناخن", "دست", "بدن", "آرایش", "آرایشی", "زیبایی", "بهداشتی", "مراقبتی",
+        "شامپو", "آبرسان", "ضدآفتاب", "ضد آفتاب", "مرطوب کننده", "شوینده", "بالم", "میسلار", "لوسیون",
+        "برنزر", "برانزر", "برق لب", "لیپ گلاس", "بی بی کرم", "پرایمر", "پنکیک", "مداد ابرو", "هایلایتر", "فاندیشن",
+        "کف سر", "پوست سر"
     ];
 
     private static readonly string[] ProductRequestTerms =
     [
         "میخوام", "میخواهم", "می خوام", "می خواهم", "معرفی کن", "معرفی کنید", "معرفی میکنی",
         "پیشنهاد بده", "پیشنهاد بدید", "پیشنهاد کنید", "دنبال"
+    ];
+
+    private static readonly string[] CustomerConcernRoots =
+    [
+        "چرب", "خشک", "وز", "ریزش", "شوره", "پوسته", "خارش", "جوش", "لک", "چروک",
+        "منافذ", "حساس", "ترک", "تیرگی", "سیاهی", "پف", "قرمز", "نازک", "کم پشت", "کم حجم",
+        "فر", "رنگ", "معمولی", "مختلط", "نرمال", "آسیب", "کدر", "دهیدراته", "کم آب"
     ];
 
     [GeneratedRegex(@"^(?:(?:یه|یک|یکی|گزینه|محصول) )?(?:ارزان|ارزون) ?تر(?:ش)?(?: (?:چی|چیه|هم|داری|هست|موجوده|میخوام|میخواهم))*$")]
@@ -83,6 +93,15 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
             && !Has(normalized, "قیمت", "چند", "هزینه", "موجود", "ترکیبات", "مواد تشکیل دهنده", "روش مصرف"))
         {
             return new(ConsultationIntent.ProductSearch, 1, "persian-product-request-rule");
+        }
+        // A standalone concern (for example, "موهام زود چرب میشه") is a consultation request,
+        // even when the customer does not explicitly say "recommend a product".
+        if (!context.HasProductContext
+            && HasProductDomain(normalized)
+            && normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Any(word => CustomerConcernRoots.Any(root => word.StartsWith(root, StringComparison.Ordinal))))
+        {
+            return new(ConsultationIntent.SkinConsultation, 1, "customer-concern-rule");
         }
         if (shortIntent.HasValue)
         {
@@ -214,6 +233,11 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
 
     private static bool HasProductDomain(string text)
     {
+        if (text.Contains("کف سر", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
         if (Has(text, ProductDomainTerms))
         {
             return true;
