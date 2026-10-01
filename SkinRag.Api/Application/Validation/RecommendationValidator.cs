@@ -21,7 +21,7 @@ public sealed class RecommendationValidator(IProductRepository repository)
     {
         var answer = GroundedAnswers.ResolveAnswer(output.Answer);
         var followUp = GroundedAnswers.ResolveFollowUp(output.FollowUpQuestion);
-        if (answer is null || output.Recommendations is null || output.Recommendations.Count > 2)
+        if (answer is null || output.Recommendations is null || output.Recommendations.Count > 5)
         {
             return null;
         }

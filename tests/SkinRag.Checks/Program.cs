@@ -8,6 +8,7 @@ using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Application.Retrieval;
 using SkinRag.Api.Application.Validation;
 using SkinRag.Api.Infrastructure;
+using SkinRag.Api.Infrastructure.Ollama;
 using SkinRag.Api.Infrastructure.Persistence;
 using SkinRag.Api.Models;
 using SkinRag.Api.Services;
@@ -542,6 +543,7 @@ sealed class ProbeRepository : IProductRepository
         "کرم صورت",
         "برچسب را بررسی کنید",
         "طبق برچسب",
+        null,
         ["skin-dry"],
         ["hydration"],
         ["glycerin"],

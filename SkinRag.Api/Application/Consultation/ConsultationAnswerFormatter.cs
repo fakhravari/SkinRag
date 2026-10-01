@@ -40,11 +40,6 @@ internal static class ConsultationAnswerFormatter
                 }
             }
 
-            if (p.IsDemo)
-            {
-                text += "\nقیمت و مشخصات این رکورد هنوز با اطلاعات فروشنده تأیید نشده‌اند.";
-            }
-
             return text;
         }));
 }

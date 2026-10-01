@@ -859,29 +859,45 @@ h3 {
     background: var(--amber-bg);
     color: var(--amber);
 }
-.product-data-notice {
-    margin-top: 10px;
-    padding: 7px 10px;
-    border-radius: 10px;
-    background: var(--amber-bg);
-    color: var(--amber);
-    font-size: 12px;
-    line-height: 1.8;
-}
 .variant-list {
     display: grid;
     gap: 5px;
     margin-top: 10px;
 }
+.variant-heading {
+    margin: 12px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+}
 .variant-row {
     font-size: 12px;
     display: flex;
+    align-items: center;
     justify-content: space-between;
     gap: 8px;
     padding: 6px 8px;
     background: white;
     border-radius: 7px;
     border: 1px solid var(--line);
+}
+.variant-info,
+.variant-price {
+    display: grid;
+    gap: 2px;
+}
+.variant-info small,
+.variant-price small,
+.product-price-label {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: normal;
+}
+.variant-price {
+    flex: 0 0 auto;
+    text-align: left;
+}
+.product-warning {
+    color: var(--amber) !important;
 }
 .product-card details {
     margin-top: 10px;

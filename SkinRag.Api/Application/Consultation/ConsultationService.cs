@@ -172,7 +172,9 @@ public sealed class ConsultationService(
         if (intent.Intent is ConsultationIntent.PriceInquiry or ConsultationIntent.AvailabilityInquiry or ConsultationIntent.ProductDetails or ConsultationIntent.ProductComparison)
         {
             var fresh = (await repository.LoadAsync(retrieval.Products.Select(x => x.Product.Id), plan, ct)).ToDictionary(p => p.Id);
-            var matches = retrieval.Products.Where(m => fresh.ContainsKey(m.Product.Id)).Take(2).Select(m => m with { Product = fresh[m.Product.Id] }).ToArray();
+            var matches = retrieval.Products.Where(m => fresh.ContainsKey(m.Product.Id))
+                .Take(intent.Intent == ConsultationIntent.ProductComparison ? 2 : 5)
+                .Select(m => m with { Product = fresh[m.Product.Id] }).ToArray();
             if (matches.Length == 0)
             {
                 return Result("اطلاعات یا موجودی محصول تغییر کرده است؛ دوباره جست‌وجو کنید.", [], "no-results");
@@ -186,7 +188,7 @@ public sealed class ConsultationService(
             return Finish(Result(ConsultationAnswerFormatter.InformationAnswer(matches, intent.Intent, vocabulary), matches, "catalog"));
         }
 
-        var context = retrieval.Products.Where(m => RecommendationValidator.CanRecommend(m.Product, plan.Filters)).Take(2).ToArray();
+        var context = retrieval.Products.Where(m => RecommendationValidator.CanRecommend(m.Product, plan.Filters)).Take(5).ToArray();
         if (context.Length == 0)
         {
             return Result("در حال حاضر محصول قابل پیشنهاد مطابق درخواست شما موجود نیست.", [], "no-results");

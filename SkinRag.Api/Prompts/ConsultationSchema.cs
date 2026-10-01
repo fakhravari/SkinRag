@@ -25,7 +25,7 @@ internal static class ConsultationSchema
                 recommendations = new
                 {
                     type = "array",
-                    maxItems = 2,
+                    maxItems = Math.Min(context.Count, 5),
                     items = new
                     {
                         type = "object",

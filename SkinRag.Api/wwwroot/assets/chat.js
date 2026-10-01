@@ -355,6 +355,8 @@
                     .addClass("product-price")
                     .text(app.number(p.price))
                     .append($("<small>").text("ریال"));
+                if ((p.variants || []).length > 1)
+                    $price.prepend($("<span>").addClass("product-price-label").text("شروع از "));
                 var $stock = $("<p>")
                     .addClass("product-stock")
                     .text(app.number(p.stockQuantity) + " عدد موجود در تنوع‌های مطابق درخواست");
@@ -365,31 +367,44 @@
                 );
                 var $variants = $("<div>").addClass("variant-list");
                 (p.variants || []).forEach(function (v) {
+                    var variantFacts = [];
+                    if (v.sizeValue) variantFacts.push(app.number(v.sizeValue) + " " + (v.sizeUnit || ""));
+                    if (v.shade) variantFacts.push("رنگ " + v.shade);
+                    if (v.finish) variantFacts.push("جلوه " + v.finish);
+                    var $variantInfo = $("<span>").addClass("variant-info").append(
+                        $("<b>").text(v.name),
+                    );
+                    if (variantFacts.length)
+                        $variantInfo.append($("<small>").text(variantFacts.join(" · ")));
+                    var $variantPrice = $("<span>").addClass("variant-price").append(
+                        $("<b>").text(app.number(v.price) + " ریال"),
+                        $("<small>").text(v.stockQuantity > 0 ? app.number(v.stockQuantity) + " عدد موجود" : "ناموجود"),
+                    );
                     $variants.append(
                         $("<div>")
                             .addClass("variant-row")
-                            .append(
-                                $("<span>").text(v.name),
-                                $("<span>").text(app.number(v.price) + " ریال"),
-                            ),
+                            .append($variantInfo, $variantPrice),
                     );
                 });
-                $card.append($variants);
+                if ((p.variants || []).length) {
+                    $card.append(
+                        $("<p>").addClass("variant-heading").text("تنوع‌های موجود در نتیجه"),
+                        $variants,
+                    );
+                }
                 var ingredients = (p.ingredients || []).map(function (slug) {
                     return ingredientNames.get(slug) || slug;
                 });
                 var $details = $("<details>").append(
-                    $("<summary>").text("ترکیبات و راهنمای استفاده"),
+                    $("<summary>").text("توضیحات و اطلاعات محصول"),
                 );
-                $details.append(
-                    $("<p>").text(
-                        "ترکیبات ثبت‌شده: " +
-                            (ingredients.join("، ") || "فهرست ساختاریافته ثبت نشده است."),
-                    ),
-                );
+                if (p.description) $details.append($("<p>").text(p.description));
+                if (ingredients.length || p.ingredientsText)
+                    $details.append($("<p>").text("ترکیبات: " + (p.ingredientsText || ingredients.join("، "))));
                 if (p.usageInstructions)
                     $details.append($("<p>").text("روش استفاده: " + p.usageInstructions));
-                if (p.warnings) $details.append($("<p>").text(p.warnings));
+                if (p.warnings) $details.append($("<p>").addClass("product-warning").text("هشدار: " + p.warnings));
+                var hasDetails = $details.children().length > 1;
                 var facts = [];
                 if (p.fragranceFree !== null && p.fragranceFree !== undefined) {
                     facts.push({
@@ -428,13 +443,7 @@
                                 }),
                             ),
                     );
-                if (p.isDemo)
-                    $card.append(
-                        $("<p>")
-                            .addClass("product-data-notice")
-                            .text("اطلاعات نمونه است؛ قیمت و مشخصات با فروشنده تأیید نشده‌اند."),
-                    );
-                $card.append($details);
+                if (hasDetails) $card.append($details);
                 $grid.append($card);
             });
             $section.append($grid);
