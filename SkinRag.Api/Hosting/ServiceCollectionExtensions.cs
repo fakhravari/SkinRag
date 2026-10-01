@@ -35,7 +35,6 @@ public static class ServiceCollectionExtensions
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             AddRateLimitPolicy(options, "consultation", 12);
-            AddRateLimitPolicy(options, "maintenance", 2);
         });
     }
 

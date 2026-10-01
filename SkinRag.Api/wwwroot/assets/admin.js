@@ -26,12 +26,10 @@
             var mode = latestStatus ? latestStatus.manualRebuildMode : "disabled";
             $rebuild.prop(
                 "disabled",
-                requestBusy || !latestStatus || latestStatus.isRebuilding || mode === "disabled",
+                requestBusy || !latestStatus || mode === "disabled",
             );
-            // Keep the option selectable while the background index is rebuilding;
-            // the rebuild action itself stays disabled until that work finishes.
+            // Keep the force option selectable while another rebuild is in progress.
             $("#forceRebuild").prop("disabled", requestBusy);
-            $("#localAccessNote").prop("hidden", mode !== "local");
             $rebuild.find("span").text(requestBusy ? "در حال بازسازی…" : "بازسازی دانش");
             $("#rebuildHint").text(
                 requestBusy
@@ -39,9 +37,9 @@
                     : !latestStatus
                       ? "در حال بررسی دسترسی بازسازی…"
                       : latestStatus.isRebuilding
-                        ? "یک بازسازی در حال اجراست؛ تا پایان آن منتظر بمانید."
+                        ? "درخواست شما پس از بازسازی در حال اجرا انجام می‌شود."
                         : mode === "disabled"
-                          ? "بازسازی دستی فقط با آدرس محلی همین دستگاه فعال است."
+                          ? "بازسازی دستی در تنظیمات سرور غیرفعال است."
                           : "از دکمهٔ بازسازی دانش برای شروع استفاده کنید.",
             );
         }
@@ -208,7 +206,7 @@
         }
 
         $rebuild.on("click", function () {
-            if (!latestStatus || requestBusy || latestStatus.isRebuilding) return;
+            if (!latestStatus || requestBusy) return;
             $("#dialogDescription").text(
                 $("#forceRebuild").prop("checked")
                     ? "تمام بردارها با نسخهٔ " + (latestStatus.embeddingVersion || "فعلی") + " دوباره تولید می‌شوند و کش نادیده گرفته می‌شود. این کار زمان بیشتری نیاز دارد. محصولات و تنوع‌ها حذف نمی‌شوند."

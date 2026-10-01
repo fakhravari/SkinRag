@@ -922,13 +922,6 @@ h3 {
     border-color: var(--line);
     background: var(--panel);
 }
-.knowledge-status-panel::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto;
-    height: 4px;
-    background: var(--purple);
-}
 .knowledge-status-heading {
     margin-bottom: 17px;
 }
