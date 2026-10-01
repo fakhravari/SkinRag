@@ -38,6 +38,12 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
         "فر", "رنگ", "معمولی", "مختلط", "نرمال", "آسیب", "کدر", "دهیدراته", "کم آب"
     ];
 
+    private static readonly string[] ProductFollowUpReferences =
+    [
+        "این", "اون", "همین", "اولی", "دومی", "سومی", "قبلی", "هم", "بین اینا",
+        "قیمتش", "ترکیباتش", "موجوده", "ارزان تر", "ارزون تر"
+    ];
+
     [GeneratedRegex(@"^(?:(?:یه|یک|یکی|گزینه|محصول) )?(?:ارزان|ارزون) ?تر(?:ش)?(?: (?:چی|چیه|هم|داری|هست|موجوده|میخوام|میخواهم))*$")]
     private static partial Regex BudgetFollowUp();
 
@@ -96,10 +102,10 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
         }
         // A standalone concern (for example, "موهام زود چرب میشه") is a consultation request,
         // even when the customer does not explicitly say "recommend a product".
-        if (!context.HasProductContext
-            && HasProductDomain(normalized)
+        if (HasProductDomain(normalized)
             && normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .Any(word => CustomerConcernRoots.Any(root => word.StartsWith(root, StringComparison.Ordinal))))
+                .Any(word => CustomerConcernRoots.Any(root => word.StartsWith(root, StringComparison.Ordinal)))
+            && (!context.HasProductContext || !Has(normalized, ProductFollowUpReferences)))
         {
             return new(ConsultationIntent.SkinConsultation, 1, "customer-concern-rule");
         }

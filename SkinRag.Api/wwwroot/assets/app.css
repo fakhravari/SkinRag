@@ -21,7 +21,7 @@
     --amber-bg: #fcf5e8;
     --red: #ad4652;
     --radius: 15px;
-    --shadow: 0 3px 3px -5px rgb(196, 205, 213), 0 3px 4px 0 rgb(196, 205, 213), 0 1px 8px 0 rgb(196, 205, 213);
+    --shadow: 0 2px 8px rgba(39, 36, 56, 0.045);
 }
 * {
     box-sizing: border-box;
@@ -143,7 +143,7 @@ h3 {
     background: var(--purple);
     border-radius: 15px;
     color: #fff;
-    box-shadow: 0 4px 12px rgba(97, 30, 110, 0.13);
+    box-shadow: 0 2px 6px rgba(97, 30, 110, 0.12);
 }
 .brand-mark svg {
     width: 25px;
@@ -177,7 +177,7 @@ h3 {
 .nav a.active {
     color: var(--purple);
     background: white;
-    box-shadow: 0 2px 8px #2724380b;
+    box-shadow: 0 1px 4px rgba(39, 36, 56, 0.06);
 }
 .nav a:hover {
     color: var(--purple);
@@ -660,7 +660,7 @@ h3 {
     gap: 12px;
     padding: 12px 14px;
     align-items: flex-end;
-    box-shadow: 0 2px 8px rgba(97, 30, 110, 0.06);
+    box-shadow: 0 1px 4px rgba(39, 36, 56, 0.045);
 }
 .composer-box:focus-within {
     border-color: #bd91c6;
@@ -726,13 +726,13 @@ h3 {
     padding: 15px;
     background: #fff;
     min-width: 0;
-    box-shadow: 0 3px 12px rgba(39, 36, 56, 0.035);
+    box-shadow: 0 2px 8px rgba(39, 36, 56, 0.045);
     transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
 }
 .product-card:hover {
     border-color: #d8ccef;
-    box-shadow: 0 8px 22px rgba(39, 36, 56, 0.08);
-    transform: translateY(-2px);
+    box-shadow: 0 3px 9px rgba(39, 36, 56, 0.07);
+    transform: translateY(-1px);
 }
 .product-card-top {
     display: flex;
@@ -919,15 +919,15 @@ h3 {
 .knowledge-status-panel {
     position: relative;
     overflow: hidden;
-    border-color: #e6e0ef;
-    background: linear-gradient(155deg, #fff 55%, #fbf9fe 100%);
+    border-color: var(--line);
+    background: var(--panel);
 }
 .knowledge-status-panel::before {
     content: "";
     position: absolute;
     inset: 0 0 auto;
     height: 4px;
-    background: linear-gradient(90deg, #9a7bd0, #6b9f8b);
+    background: var(--purple);
 }
 .knowledge-status-heading {
     margin-bottom: 17px;
@@ -944,7 +944,7 @@ h3 {
     padding: 17px 18px;
     border: 1px solid #ece7f4;
     border-radius: 17px;
-    background: linear-gradient(110deg, #f8f5fc, #fff 78%);
+    background: linear-gradient(110deg, var(--lavender), #fff 78%);
 }
 .status-hero-icon {
     height: 54px;
@@ -1000,7 +1000,7 @@ h3 {
 }
 .progress-bar {
     height: 100%;
-    background: linear-gradient(90deg, #8e70c7, #6e9d8a);
+    background: var(--purple);
     width: 0;
     border-radius: 10px;
     transition: width 0.55s ease;
@@ -1514,7 +1514,7 @@ code {
 /* Comfortable Persian typography and optional, collapsible preferences. */
 :root {
     --muted: #625f73;
-    --shadow: 0 3px 3px -5px rgb(196, 205, 213), 0 3px 4px 0 rgb(196, 205, 213), 0 1px 8px 0 rgb(196, 205, 213);
+    --shadow: 0 2px 8px rgba(39, 36, 56, 0.045);
 }
 body {
     background: radial-gradient(ellipse at top right, #f1e6f366, transparent 55%), var(--bg);

@@ -20,6 +20,7 @@ public sealed record KnowledgeIndexStatus(
     int TotalProducts,
     int CachedProducts,
     string EmbeddingModel,
+    string EmbeddingVersion,
     string ChatModel,
     string? LastError,
     string ManualRebuildMode = "disabled");
@@ -49,6 +50,7 @@ public sealed class KnowledgeIndexService(
             Volatile.Read(ref _total),
             Volatile.Read(ref _cached),
             ollama.EmbeddingModel,
+            configuration["Rag:EmbeddingVersion"] ?? "catalog-v4",
             configuration["Ollama:ChatModel"] ?? "",
             Volatile.Read(ref _lastError));
     }
@@ -67,7 +69,7 @@ public sealed class KnowledgeIndexService(
             Volatile.Write(ref _total, products.Count);
             var cache = await db.ProductEmbeddings.Where(e => e.Model == ollama.EmbeddingModel).ToDictionaryAsync(e => e.ProductId, cancellationToken);
             var prefix = configuration["Rag:DocumentPrefix"] ?? "search_document: ";
-            var version = configuration["Rag:EmbeddingVersion"] ?? "catalog-v2";
+            var version = configuration["Rag:EmbeddingVersion"] ?? "catalog-v4";
             var next = new Dictionary<int, KnowledgeDocument>();
             var pending = new List<(Product Product, string Content, string Hash)>();
             foreach (var p in products)

@@ -107,6 +107,7 @@
             $("#cachedProducts").text(app.number(status.cachedProducts));
             $("#lastIndexed").text(app.date(status.updatedAtUtc));
             $("#embeddingModel").text(status.embeddingModel || "ثبت نشده");
+            $("#embeddingVersion").text(status.embeddingVersion || "ثبت نشده");
             $("#chatModel").text(status.chatModel || "ثبت نشده");
             $("#indexError")
                 .text(status.lastError || "")
@@ -210,7 +211,7 @@
             if (!latestStatus || requestBusy || latestStatus.isRebuilding) return;
             $("#dialogDescription").text(
                 $("#forceRebuild").prop("checked")
-                    ? "تمام بردارها دوباره تولید می‌شوند و کش نادیده گرفته می‌شود. این کار زمان بیشتری نیاز دارد. محصولات و تنوع‌ها حذف نمی‌شوند."
+                    ? "تمام بردارها با نسخهٔ " + (latestStatus.embeddingVersion || "فعلی") + " دوباره تولید می‌شوند و کش نادیده گرفته می‌شود. این کار زمان بیشتری نیاز دارد. محصولات و تنوع‌ها حذف نمی‌شوند."
                     : "محصول‌های فعال بررسی می‌شوند و فقط محتوای تغییرکرده بردار تازه می‌گیرد. کاتالوگ محصولات حذف یا تغییر نمی‌کند.",
             );
             $dialog[0].showModal();
