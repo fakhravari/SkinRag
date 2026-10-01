@@ -61,8 +61,8 @@
         </div>
     </section>
     <div class="admin-layout">
-        <section class="panel admin-panel">
-            <div class="panel-heading">
+        <section class="panel admin-panel knowledge-status-panel">
+            <div class="panel-heading knowledge-status-heading">
                 <h2>وضعیت پایگاه دانش</h2>
                 <span id="indexBadge" class="pill warn" role="status">
                     <span class="dot"></span>
@@ -75,25 +75,27 @@
                         <use href="/assets/icons.svg#activity" />
                     </svg>
                 </span>
-                <div>
+                <div class="status-copy">
                     <h3 id="statusTitle">بررسی وضعیت…</h3>
                     <p id="statusDescription">اطلاعات وضعیت از سرور دریافت می‌شود.</p>
                 </div>
             </div>
-            <div
-                id="indexProgress"
-                class="progress-track"
-                role="progressbar"
-                aria-label="پیشرفت ساخت دانش"
-                aria-valuemin="0"
-                aria-valuemax="100"
-                aria-valuenow="0"
-            >
-                <div id="progressBar" class="progress-bar"></div>
-            </div>
-            <div class="progress-caption">
-                <span id="progressCaption">—</span>
-                <span id="progressPercent">—</span>
+            <div class="index-progress-panel">
+                <div class="progress-caption">
+                    <span id="progressCaption">—</span>
+                    <span id="progressPercent">—</span>
+                </div>
+                <div
+                    id="indexProgress"
+                    class="progress-track"
+                    role="progressbar"
+                    aria-label="پیشرفت ساخت دانش"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow="0"
+                >
+                    <div id="progressBar" class="progress-bar"></div>
+                </div>
             </div>
             <dl class="metric-list">
                 <div>
@@ -142,21 +144,8 @@
                 محصول‌های فعال را دوباره بررسی کنید. در حالت معمول، فقط محتوای تغییرکرده بردار تازه
                 می‌گیرد.
             </p>
-            <div id="adminKeyField" class="field" style="margin-top: 20px">
-                <label for="adminKey">کلید مدیریت</label>
-                <input
-                    id="adminKey"
-                    type="password"
-                    autocomplete="off"
-                    placeholder="کلید مدیریت سرور"
-                    aria-describedby="keyHint"
-                />
-                <span id="keyHint" class="field-hint">
-                    کلید ذخیره نمی‌شود و فقط برای این درخواست استفاده می‌شود.
-                </span>
-            </div>
             <div id="localAccessNote" class="notice info" style="margin: 18px 0" hidden>
-                دسترسی محلی توسعه فعال است؛ در این اتصال نیازی به کلید نیست.
+                بازسازی بدون کلید فقط با آدرس محلی همین دستگاه فعال است.
             </div>
             <div class="rebuild-options">
                 <label class="checkbox">

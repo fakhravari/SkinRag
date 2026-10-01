@@ -28,12 +28,10 @@
                 "disabled",
                 requestBusy || !latestStatus || latestStatus.isRebuilding || mode === "disabled",
             );
-            $("#forceRebuild").prop(
-                "disabled",
-                requestBusy || !!(latestStatus && latestStatus.isRebuilding),
-            );
-            $("#adminKeyField").prop("hidden", mode !== "api-key");
-            $("#localAccessNote").prop("hidden", mode !== "local-development");
+            // Keep the option selectable while the background index is rebuilding;
+            // the rebuild action itself stays disabled until that work finishes.
+            $("#forceRebuild").prop("disabled", requestBusy);
+            $("#localAccessNote").prop("hidden", mode !== "local");
             $rebuild.find("span").text(requestBusy ? "در حال بازسازی…" : "بازسازی دانش");
             $("#rebuildHint").text(
                 requestBusy
@@ -43,10 +41,8 @@
                       : latestStatus.isRebuilding
                         ? "یک بازسازی در حال اجراست؛ تا پایان آن منتظر بمانید."
                         : mode === "disabled"
-                          ? "بازسازی دستی فعال نیست؛ تنظیم کلید مدیریت روی سرور لازم است."
-                          : mode === "local-development"
-                            ? "فقط اتصال محلی در محیط توسعه این دسترسی را دارد."
-                            : "برای بازسازی، کلید مدیریت معتبر را وارد کنید.",
+                          ? "بازسازی دستی فقط با آدرس محلی همین دستگاه فعال است."
+                          : "از دکمهٔ بازسازی دانش برای شروع استفاده کنید.",
             );
         }
 
@@ -86,7 +82,7 @@
                       ? "محصول‌های فعال در دانش ثبت شده‌اند و چت در دسترس است."
                       : "پس از تکمیل اولین بازسازی، گفت‌وگو در دسترس خواهد بود.",
             );
-            $("#statusHeroIcon").toggleClass("pending", state !== "ready");
+            $("#statusHeroIcon").removeClass("pending building error").addClass(state);
             var percent = status.totalProducts
                 ? Math.min(
                       100,
@@ -212,11 +208,6 @@
 
         $rebuild.on("click", function () {
             if (!latestStatus || requestBusy || latestStatus.isRebuilding) return;
-            if (latestStatus.manualRebuildMode === "api-key" && !$("#adminKey").val().trim()) {
-                app.toast("کلید مدیریت را وارد کنید.");
-                $("#adminKey").trigger("focus");
-                return;
-            }
             $("#dialogDescription").text(
                 $("#forceRebuild").prop("checked")
                     ? "تمام بردارها دوباره تولید می‌شوند و کش نادیده گرفته می‌شود. این کار زمان بیشتری نیاز دارد. محصولات و تنوع‌ها حذف نمی‌شوند."
@@ -230,9 +221,7 @@
         $("#confirmRebuild").on("click", function () {
             $dialog[0].close();
             if (!latestStatus || requestBusy) return;
-            var force = $("#forceRebuild").prop("checked"),
-                key = $("#adminKey").val().trim();
-            $("#adminKey").val("");
+            var force = $("#forceRebuild").prop("checked");
             requestBusy = true;
             updateControls();
             lastActionError = "";
@@ -247,7 +236,7 @@
                 contentType: "application/json; charset=utf-8",
                 data: "{}",
                 timeout: 1200000,
-                headers: { "X-Admin-Key": key, "X-Requested-With": "XMLHttpRequest" },
+                headers: { "X-Requested-With": "XMLHttpRequest" },
             })
                 .done(function (status) {
                     lastActionError = "";

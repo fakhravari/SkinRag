@@ -81,6 +81,19 @@
             updateSummary();
         }
 
+        function resetPreferences(collapsePanel) {
+            $(".filters-panel select").val("");
+            $("#excludedIngredients").val([]);
+            $("#maxPrice").val("");
+            $("#fragranceFree").prop("checked", false);
+            $(".advanced-filters").prop("open", false);
+            setDomain(null, false);
+            if (collapsePanel) {
+                $(".filters-panel").removeClass("filters-open");
+                $("#toggleFilters").attr("aria-expanded", "false").text("نمایش فیلترها");
+            }
+        }
+
         function updateSummary() {
             var labels = domain ? [app.domainNames[domain]] : [];
             if ($("#category").val()) labels.push($("#category option:selected").text());
@@ -272,6 +285,10 @@
             return $message;
         }
 
+        function productImagePlaceholder() {
+            return $("<div>").addClass("product-card-image-placeholder").append(app.icon("sparkles"));
+        }
+
         function renderProducts($message, response) {
             if (!response.products || !response.products.length) return;
             var $section = $("<section>")
@@ -299,31 +316,40 @@
                             .addClass("product-id")
                             .text("#" + p.id),
                     );
+                var $image = p.image
+                    ? $("<img>")
+                          .addClass("product-card-image")
+                          .attr("src", p.image)
+                          .attr("alt", p.name)
+                          .attr("loading", "lazy")
+                          .on("error", function () { $(this).replaceWith(productImagePlaceholder()); })
+                    : productImagePlaceholder();
+                var $summary = $("<div>")
+                    .addClass("product-summary")
+                    .append(
+                        $("<h3>").text(p.name),
+                        $("<p>")
+                            .addClass("product-brand")
+                            .text(p.brand || "برند ثبت نشده"),
+                        $("<div>")
+                            .addClass("product-code")
+                            .append(
+                                $("<span>").text("کد محصول"),
+                                $("<b>").attr("dir", "ltr").text(p.sku || "#" + p.id),
+                            ),
+                    );
+                var $main = $("<div>").addClass("product-main").append($image, $summary);
+                var $price = $("<div>")
+                    .addClass("product-price")
+                    .text(app.number(p.price))
+                    .append($("<small>").text("ریال"));
+                var $stock = $("<p>")
+                    .addClass("product-stock")
+                    .text(app.number(p.stockQuantity) + " عدد موجود در تنوع‌های مطابق درخواست");
                 $card.append(
                     $top,
-                    p.image
-                        ? $("<img>")
-                              .addClass("product-card-image")
-                              .attr("src", p.image)
-                              .attr("alt", p.name)
-                              .attr("loading", "lazy")
-                              .on("error", function () { $(this).remove(); })
-                        : null,
-                    $("<h3>").text(p.name),
-                    $("<p>")
-                        .addClass("product-brand")
-                        .text(p.brand || "برند ثبت نشده"),
-                );
-                $card.append(
-                    $("<div>")
-                        .addClass("product-price")
-                        .text(app.number(p.price))
-                        .append($("<small>").text("ریال")),
-                );
-                $card.append(
-                    $("<p>")
-                        .addClass("product-stock")
-                        .text(app.number(p.stockQuantity) + " عدد موجود در تنوع‌های مطابق درخواست"),
+                    $main,
+                    $("<div>").addClass("product-metrics").append($price, $stock),
                 );
                 var $variants = $("<div>").addClass("variant-list");
                 (p.variants || []).forEach(function (v) {
@@ -451,7 +477,10 @@
                             );
                         renderProducts($thinking, response);
                         history.push(
-                            { role: "user", content: question.slice(0, 800) },
+                            {
+                                role: "user",
+                                content: (question || "جست‌وجو بر اساس فیلترهای انتخاب‌شده").slice(0, 800),
+                            },
                             { role: "assistant", content: response.answer.slice(0, 800) },
                         );
                         history = history.slice(-4);
@@ -510,6 +539,7 @@
             if (busy) return;
             history = [];
             conversationId = null;
+            resetPreferences(true);
             $messages.empty();
             $("#welcome").prop("hidden", false);
             $question.val("").trigger("input").trigger("focus");
@@ -528,11 +558,7 @@
         });
         $(".filters-panel input, .filters-panel select").on("change input", updateSummary);
         $("#resetFilters").on("click", function () {
-            $(".filters-panel select").val("");
-            $("#excludedIngredients").val([]);
-            $("#maxPrice").val("");
-            $("#fragranceFree").prop("checked", false);
-            setDomain(null, false);
+            resetPreferences(false);
         });
         $("#applyFilters").on("click", function () {
             $("#chatForm").trigger("submit");

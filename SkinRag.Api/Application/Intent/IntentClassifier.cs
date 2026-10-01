@@ -16,6 +16,18 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
     [GeneratedRegex(@"^(?:محصول )?[0-9]+ (?:موجوده|موجود است|موجود هست)$")]
     private static partial Regex AvailabilityReference();
 
+    // Match product domains instead of maintaining a growing list of individual SKUs or categories.
+    private static readonly string[] ProductDomainTerms =
+    [
+        "پوست", "مو", "صورت", "لب", "چشم", "ناخن", "آرایش", "آرایشی", "زیبایی", "بهداشتی", "مراقبتی"
+    ];
+
+    private static readonly string[] ProductRequestTerms =
+    [
+        "میخوام", "میخواهم", "می خوام", "می خواهم", "معرفی کن", "معرفی کنید", "معرفی میکنی",
+        "پیشنهاد بده", "پیشنهاد بدید", "پیشنهاد کنید", "دنبال"
+    ];
+
     [GeneratedRegex(@"^(?:(?:یه|یک|یکی|گزینه|محصول) )?(?:ارزان|ارزون) ?تر(?:ش)?(?: (?:چی|چیه|هم|داری|هست|موجوده|میخوام|میخواهم))*$")]
     private static partial Regex BudgetFollowUp();
 
@@ -64,13 +76,13 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
         {
             shortIntent = ConsultationIntent.FollowUp;
         }
-        // Common self-contained Persian product requests should not depend on
-        // the local model's confidence calibration.
-        if (Has(normalized, "پوست خشک")
-            && Has(normalized, "کرم")
-            && Has(normalized, "مرطوب کننده", "مرطوبکننده"))
+        // Explicit product requests in a known care domain bypass small-model confidence calibration.
+        // Factual price, stock, and ingredient questions continue through normal intent routing.
+        if (HasProductDomain(normalized)
+            && Has(normalized, ProductRequestTerms)
+            && !Has(normalized, "قیمت", "چند", "هزینه", "موجود", "ترکیبات", "مواد تشکیل دهنده", "روش مصرف"))
         {
-            return new(ConsultationIntent.ProductSearch, 1, "persian-product-rule");
+            return new(ConsultationIntent.ProductSearch, 1, "persian-product-request-rule");
         }
         if (shortIntent.HasValue)
         {
@@ -199,4 +211,17 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
     }
 
     private static bool Has(string text, params string[] phrases) => phrases.Any(p => (" " + text + " ").Contains(" " + p + " ", StringComparison.Ordinal));
+
+    private static bool HasProductDomain(string text)
+    {
+        if (Has(text, ProductDomainTerms))
+        {
+            return true;
+        }
+
+        return text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Any(word =>
+            word.StartsWith("مو", StringComparison.Ordinal) && word.Length <= 7
+            || word.StartsWith("پوست", StringComparison.Ordinal) && word.Length <= 7
+            || word.StartsWith("صورت", StringComparison.Ordinal) && word.Length <= 7);
+    }
 }

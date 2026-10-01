@@ -63,6 +63,8 @@ public static class PipelinePrompts
         "امروز قراره چه کارایی انجام بدی؟"=>SMALL_TALK/DailyPlans.
         "پوست خودت خشکه؟"=>SMALL_TALK/Identity.
         "سلام خوبی؟ یه ضدآفتاب میخوام"=>PRODUCT_SEARCH, requiresContext=false.
+        "یک شامپو برای موهای چرب معرفی کنید"=>PRODUCT_SEARCH, requiresContext=false.
+        "یک رژ لب صورتی با جلوه مات می‌خواهم"=>PRODUCT_SEARCH, requiresContext=false.
         "ممنون، ترکیباتش چیه؟"=>PRODUCT_DETAILS, requiresContext=true.
         "یه چیز خوب میخوام" without a clear product need=>UNCLEAR/General.
         """;

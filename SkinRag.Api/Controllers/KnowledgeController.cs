@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using SkinRag.Api.Services;
@@ -8,30 +6,20 @@ namespace SkinRag.Api.Controllers;
 
 [ApiController]
 [Route("api/knowledge")]
-public sealed class KnowledgeController(KnowledgeIndexService indexService, IConfiguration configuration, IWebHostEnvironment environment) : ControllerBase
+public sealed class KnowledgeController(KnowledgeIndexService indexService) : ControllerBase
 {
     [HttpPost("rebuild")]
     [EnableRateLimiting("maintenance")]
     public async Task<IActionResult> Rebuild(CancellationToken cancellationToken, [FromQuery] bool force = false)
     {
-        var expected = configuration["Admin:ApiKey"];
-        if (string.IsNullOrWhiteSpace(expected))
+        if (RebuildMode() != "local")
         {
-            if (RebuildMode() != "local-development")
-            {
-                return Problem(statusCode: 503, title: "بازسازی دستی فعال نیست؛ کلید مدیریتی روی سرور تنظیم نشده است.");
-            }
-
-            var origin = Request.Headers.Origin.ToString();
-            if (Request.Headers["X-Requested-With"] != "XMLHttpRequest" || !Request.HasJsonContentType()
-                || (origin.Length > 0 && origin != $"{Request.Scheme}://{Request.Host}"))
-            {
-                return Unauthorized();
-            }
+            return Problem(statusCode: 403, title: "بازسازی دستی فقط از همین دستگاه و با آدرس محلی در دسترس است.");
         }
-        else if (!CryptographicOperations.FixedTimeEquals(
-            SHA256.HashData(Encoding.UTF8.GetBytes(expected)),
-            SHA256.HashData(Encoding.UTF8.GetBytes(Request.Headers["X-Admin-Key"].ToString()))))
+
+        var origin = Request.Headers.Origin.ToString();
+        if (Request.Headers["X-Requested-With"] != "XMLHttpRequest" || !Request.HasJsonContentType()
+            || origin != $"{Request.Scheme}://{Request.Host}")
         {
             return Unauthorized();
         }
@@ -54,14 +42,12 @@ public sealed class KnowledgeController(KnowledgeIndexService indexService, ICon
 
     private string RebuildMode()
     {
-        if (!string.IsNullOrWhiteSpace(configuration["Admin:ApiKey"]))
-        {
-            return "api-key";
-        }
-
-        return environment.IsDevelopment() && HttpContext.Connection.RemoteIpAddress is
-        {
-        } ip
-            && System.Net.IPAddress.IsLoopback(ip) ? "local-development" : "disabled";
+        var remoteIp = HttpContext.Connection.RemoteIpAddress;
+        var host = Request.Host.Host;
+        var localHost = host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+            || System.Net.IPAddress.TryParse(host, out var hostIp) && System.Net.IPAddress.IsLoopback(hostIp);
+        return remoteIp is not null && System.Net.IPAddress.IsLoopback(remoteIp) && localHost
+            ? "local"
+            : "disabled";
     }
 }

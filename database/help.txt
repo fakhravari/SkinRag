@@ -1,0 +1,52 @@
+C:\Ollama\ollama.exe serve
+C:\Ollama\ollama.exe list
+
+C:\Ollama\ollama.exe pull qwen2.5:7b && C:\Ollama\ollama.exe pull qwen2.5:3b && C:\Ollama\ollama.exe pull nomic-embed-text
+
+
+ollama pull qwen2.5:7b && ollama pull qwen2.5:3b && ollama pull nomic-embed-text
+
+
+folder to cmd 
+
+ollama rm qwen2.5-coder:1.5b
+ollama rm qwen2.5-coder:7b
+ollama list
+
+ollama create qwen2.5-coder:1.5b -f Modelfile-1.5b
+ollama create qwen2.5-coder:7b-32k -f Modelfile-7b
+
+
+ollama list
+ollama run qwen2.5-coder:1.5b
+ollama run qwen2.5-coder:7b-32k
+
+
+
+C:\Users\Fakhravari\.continue\config.yaml
+name: Main Config
+version: 1.0.0
+schema: v1
+models:
+  - name: Qwen 2.5 Coder 7B
+    provider: ollama
+    model: qwen2.5-coder:7b-32k
+    apiBase: http://localhost:11434
+    contextLength: 32768
+
+  - name: Qwen 2.5 Coder 1.5B
+    provider: ollama
+    model: qwen2.5-coder:1.5b
+    apiBase: http://localhost:11434
+    contextLength: 32768
+	
+	
+	
+	
+	
+	
+power shel	
+	
+Get-CimInstance Win32_ComputerSystem | Select-Object TotalPhysicalMemory
+Get-CimInstance Win32_ComputerSystem | Select-Object TotalPhysicalMemory
+Get-CimInstance Win32_VideoController | Select-Object Name,AdapterRAM
