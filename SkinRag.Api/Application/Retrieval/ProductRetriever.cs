@@ -1,7 +1,7 @@
 using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Infrastructure;
 using SkinRag.Api.Models;
-using SkinRag.Api.Services;
+using SkinRag.Api.Services.Knowledge;
 
 namespace SkinRag.Api.Application.Retrieval;
 

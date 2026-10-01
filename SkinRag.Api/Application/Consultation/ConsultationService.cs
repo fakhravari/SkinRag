@@ -6,7 +6,6 @@ using SkinRag.Api.Application.Retrieval;
 using SkinRag.Api.Application.Validation;
 using SkinRag.Api.Models;
 using SkinRag.Api.Prompts;
-using SkinRag.Api.Services;
 
 namespace SkinRag.Api.Application.Consultation;
 
@@ -223,11 +222,9 @@ public sealed class ConsultationService(
             return Result("موجودی یا اطلاعات محصولات تغییر کرده است؛ دوباره جست‌وجو کنید.", [], "no-results");
         }
 
-        var answer = validated.NeedsMoreInformation ? validated.Answer + "\n" + validated.FollowUpQuestion : validated.Answer + "\n" + string.Join("\n", validated.Products.Select(x => $"- [{x.Product.Id}] {x.Product.Name}؛ {ConsultationAnswerFormatter.Price(x.Product)} {x.Reason}"));
-        if (validated.Products.Any(x => x.Product.IsDemo))
-        {
-            answer += "\nقیمت و مشخصات این رکوردها هنوز با اطلاعات فروشنده تأیید نشده‌اند.";
-        }
+        var answer = validated.NeedsMoreInformation
+            ? validated.Answer + "\n" + validated.FollowUpQuestion
+            : validated.Answer;
 
         return Finish(Result(answer, validated.Products, mode, notice, validated.NeedsMoreInformation, validated.FollowUpQuestion));
     }

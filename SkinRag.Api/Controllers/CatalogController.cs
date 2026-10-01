@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SkinRag.Api.Data;
 using SkinRag.Api.Models;
-using SkinRag.Api.Services;
+using SkinRag.Api.Services.Catalog;
 
 namespace SkinRag.Api.Controllers;
 

@@ -3,7 +3,6 @@ using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Parsing;
 using SkinRag.Api.Infrastructure;
 using SkinRag.Api.Prompts;
-using SkinRag.Api.Services;
 
 namespace SkinRag.Api.Application.Intent;
 

@@ -1,4 +1,4 @@
-namespace SkinRag.Api.Services;
+namespace SkinRag.Api.Services.Knowledge;
 
 public sealed class KnowledgeIndexWorker(KnowledgeIndexService index, IConfiguration configuration, ILogger<KnowledgeIndexWorker> logger) : BackgroundService
 {

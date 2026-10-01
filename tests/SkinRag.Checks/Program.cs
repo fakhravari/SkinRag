@@ -475,6 +475,7 @@ if (args.Contains("--live"))
 
 sealed class ProbeOllama : IOllamaClient
 {
+    public string EmbeddingModel => "nomic-embed-text";
     public List<string> Stages { get; } = [];
     public int Embeds { get; private set; }
     public string? ThrowStage { get; set; }

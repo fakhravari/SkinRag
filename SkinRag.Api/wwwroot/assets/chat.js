@@ -3,6 +3,8 @@
     $(function () {
         var taxonomy = null,
             ingredientNames = new Map(),
+            profileNames = new Map(),
+            concernNames = new Map(),
             domain = null,
             history = [],
             conversationId = null,
@@ -121,6 +123,16 @@
                     taxonomy = data;
                     ingredientNames = new Map(
                         data.ingredients.map(function (item) {
+                            return [item.slug, item.name];
+                        }),
+                    );
+                    profileNames = new Map(
+                        data.profiles.map(function (item) {
+                            return [item.slug, item.name];
+                        }),
+                    );
+                    concernNames = new Map(
+                        data.concerns.map(function (item) {
                             return [item.slug, item.name];
                         }),
                     );
@@ -378,13 +390,50 @@
                 if (p.usageInstructions)
                     $details.append($("<p>").text("روش استفاده: " + p.usageInstructions));
                 if (p.warnings) $details.append($("<p>").text(p.warnings));
-                if (p.isDemo)
-                    $details.append(
-                        $("<p>").text(
-                            "قیمت و مشخصات این رکورد هنوز با اطلاعات فروشنده تأیید نشده‌اند.",
-                        ),
+                var facts = [];
+                if (p.fragranceFree !== null && p.fragranceFree !== undefined) {
+                    facts.push({
+                        text: p.fragranceFree ? "بدون عطر افزوده" : "دارای عطر افزوده",
+                        className: p.fragranceFree ? "fragrance-free" : "fragrance-added",
+                    });
+                }
+                var profileFactCount = 0,
+                    concernFactCount = 0;
+                (p.profiles || []).slice(0, 2).forEach(function (slug) {
+                    if (profileNames.has(slug)) {
+                        facts.push({ text: profileNames.get(slug) });
+                        profileFactCount++;
+                    }
+                });
+                (p.concerns || []).slice(0, 3).forEach(function (slug) {
+                    if (concernNames.has(slug)) {
+                        facts.push({ text: concernNames.get(slug) });
+                        concernFactCount++;
+                    }
+                });
+                if (!profileFactCount) {
+                    if (p.skinTypes) facts.push({ text: p.skinTypes });
+                    if (p.hairTypes) facts.push({ text: p.hairTypes });
+                }
+                if (!concernFactCount && p.concernsText) facts.push({ text: p.concernsText });
+                if (facts.length)
+                    $card.append(
+                        $("<div>")
+                            .addClass("product-facts")
+                            .append(
+                                facts.map(function (fact) {
+                                    return $("<span>")
+                                        .addClass("product-fact " + (fact.className || ""))
+                                        .text(fact.text);
+                                }),
+                            ),
                     );
-                if (match.reason) $details.append($("<p>").text(match.reason));
+                if (p.isDemo)
+                    $card.append(
+                        $("<p>")
+                            .addClass("product-data-notice")
+                            .text("اطلاعات نمونه است؛ قیمت و مشخصات با فروشنده تأیید نشده‌اند."),
+                    );
                 $card.append($details);
                 $grid.append($card);
             });
@@ -468,7 +517,26 @@
                         )
                             throw new Error("Invalid response");
                         conversationId = response.conversationId || conversationId;
-                        $thinking.find(".message-bubble").empty().text(response.answer);
+                        var cardOnlyIntents = [
+                                "PRICE_INQUIRY",
+                                "AVAILABILITY_INQUIRY",
+                                "PRODUCT_DETAILS",
+                                "PRODUCT_COMPARISON",
+                            ],
+                            shortCatalogAnswers = [
+                                "این گزینه‌ها با نیاز و فیلترهای شما در کاتالوگ فعلی مطابقت دارند.",
+                                "این محصولات در کاتالوگ فعلی برای بررسی شما انتخاب شدند.",
+                            ],
+                            hideAnswer =
+                                response.products.length > 0 &&
+                                (cardOnlyIntents.includes(response.intent) ||
+                                    shortCatalogAnswers.includes(response.answer));
+                        $thinking
+                            .find(".message-bubble")
+                            .empty()
+                            .text(response.answer)
+                            .prop("hidden", hideAnswer);
+                        $thinking.find(".message-meta").prop("hidden", hideAnswer);
                         if (response.notice)
                             $thinking.append(
                                 $("<p>")

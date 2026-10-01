@@ -8,8 +8,10 @@ using SkinRag.Api.Application.Retrieval;
 using SkinRag.Api.Application.Validation;
 using SkinRag.Api.Data;
 using SkinRag.Api.Infrastructure;
+using SkinRag.Api.Infrastructure.Ollama;
 using SkinRag.Api.Infrastructure.Persistence;
-using SkinRag.Api.Services;
+using SkinRag.Api.Services.Catalog;
+using SkinRag.Api.Services.Knowledge;
 
 namespace SkinRag.Api.Hosting;
 

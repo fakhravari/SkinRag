@@ -3,7 +3,7 @@ using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Retrieval;
 using SkinRag.Api.Data;
 using SkinRag.Api.Models;
-using SkinRag.Api.Services;
+using SkinRag.Api.Services.Catalog;
 
 namespace SkinRag.Api.Infrastructure.Persistence;
 

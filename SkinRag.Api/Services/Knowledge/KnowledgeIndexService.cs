@@ -1,15 +1,15 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using SkinRag.Api.Application.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using SkinRag.Api.Data;
 using SkinRag.Api.Models;
+using SkinRag.Api.Services.Catalog;
 
-namespace SkinRag.Api.Services;
+namespace SkinRag.Api.Services.Knowledge;
 
 public sealed record KnowledgeSnapshot(IReadOnlyList<KnowledgeDocument> Documents, bool IsReady, DateTime? UpdatedAtUtc);
-
-public sealed class IndexNotReadyException(string message) : Exception(message);
 
 public sealed record KnowledgeIndexStatus(
     int IndexedProducts,
@@ -22,15 +22,15 @@ public sealed record KnowledgeIndexStatus(
     string EmbeddingModel,
     string EmbeddingVersion,
     string ChatModel,
-    string? LastError,
-    string ManualRebuildMode = "disabled");
+    string? LastError);
 
 public sealed class KnowledgeIndexService(
     IDbContextFactory<AppDbContext> dbFactory,
-    OllamaClient ollama,
+    IOllamaClient ollama,
     IConfiguration configuration,
     ILogger<KnowledgeIndexService> logger)
 {
+    private const string DefaultEmbeddingVersion = "catalog-v4";
     private readonly SemaphoreSlim _gate = new(1, 1);
     private KnowledgeSnapshot _snapshot = new(Array.Empty<KnowledgeDocument>(), false, null);
     private int _isRebuilding, _processed, _total, _cached;
@@ -50,7 +50,7 @@ public sealed class KnowledgeIndexService(
             Volatile.Read(ref _total),
             Volatile.Read(ref _cached),
             ollama.EmbeddingModel,
-            configuration["Rag:EmbeddingVersion"] ?? "catalog-v4",
+            configuration["Rag:EmbeddingVersion"] ?? DefaultEmbeddingVersion,
             configuration["Ollama:ChatModel"] ?? "",
             Volatile.Read(ref _lastError));
     }
@@ -69,7 +69,7 @@ public sealed class KnowledgeIndexService(
             Volatile.Write(ref _total, products.Count);
             var cache = await db.ProductEmbeddings.Where(e => e.Model == ollama.EmbeddingModel).ToDictionaryAsync(e => e.ProductId, cancellationToken);
             var prefix = configuration["Rag:DocumentPrefix"] ?? "search_document: ";
-            var version = configuration["Rag:EmbeddingVersion"] ?? "catalog-v4";
+            var version = configuration["Rag:EmbeddingVersion"] ?? DefaultEmbeddingVersion;
             var next = new Dictionary<int, KnowledgeDocument>();
             var pending = new List<(Product Product, string Content, string Hash)>();
             foreach (var p in products)

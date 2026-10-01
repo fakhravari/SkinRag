@@ -1,9 +1,8 @@
 using System.Collections.Frozen;
 using System.Text.RegularExpressions;
-using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Infrastructure;
 
-namespace SkinRag.Api.Services;
+namespace SkinRag.Api.Application.Intent;
 
 public static partial class ConversationReplies
 {

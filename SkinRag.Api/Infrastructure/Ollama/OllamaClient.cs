@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using SkinRag.Api.Application.Abstractions;
 
-namespace SkinRag.Api.Services;
+namespace SkinRag.Api.Infrastructure.Ollama;
 
 public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfiguration configuration, ILogger<OllamaClient> logger) : IOllamaClient
 {

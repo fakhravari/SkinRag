@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
+using SkinRag.Api.Application.Retrieval;
 using SkinRag.Api.Application.Validation;
-using SkinRag.Api.Services;
 
 namespace SkinRag.Api.Infrastructure;
 

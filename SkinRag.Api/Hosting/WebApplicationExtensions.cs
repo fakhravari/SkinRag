@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SkinRag.Api.Data;
-using SkinRag.Api.Services;
+using SkinRag.Api.Services.Knowledge;
 
 namespace SkinRag.Api.Hosting;
 

@@ -23,11 +23,7 @@
         }
 
         function updateControls() {
-            var mode = latestStatus ? latestStatus.manualRebuildMode : "disabled";
-            $rebuild.prop(
-                "disabled",
-                requestBusy || !latestStatus || mode === "disabled",
-            );
+            $rebuild.prop("disabled", requestBusy || !latestStatus);
             // Keep the force option selectable while another rebuild is in progress.
             $("#forceRebuild").prop("disabled", requestBusy);
             $rebuild.find("span").text(requestBusy ? "در حال بازسازی…" : "بازسازی دانش");
@@ -35,12 +31,10 @@
                 requestBusy
                     ? "درخواست ارسال شده است؛ پیشرفت در بخش وضعیت نمایش داده می‌شود."
                     : !latestStatus
-                      ? "در حال بررسی دسترسی بازسازی…"
+                      ? "در حال بررسی وضعیت کاتالوگ…"
                       : latestStatus.isRebuilding
                         ? "درخواست شما پس از بازسازی در حال اجرا انجام می‌شود."
-                        : mode === "disabled"
-                          ? "بازسازی دستی در تنظیمات سرور غیرفعال است."
-                          : "از دکمهٔ بازسازی دانش برای شروع استفاده کنید.",
+                        : "از دکمهٔ بازسازی دانش برای شروع استفاده کنید.",
             );
         }
 

@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using SkinRag.Api.Services;
+using SkinRag.Api.Services.Knowledge;
 
 namespace SkinRag.Api.Controllers;
 
@@ -11,18 +11,12 @@ public sealed class KnowledgeController(KnowledgeIndexService indexService) : Co
     public async Task<IActionResult> Rebuild(CancellationToken cancellationToken, [FromQuery] bool force = false)
     {
         await indexService.RebuildAsync(cancellationToken, force);
-        return Ok(indexService.Status() with
-        {
-            ManualRebuildMode = "enabled"
-        });
+        return Ok(indexService.Status());
     }
 
     [HttpGet("status")]
     public IActionResult Status()
     {
-        return Ok(indexService.Status() with
-        {
-            ManualRebuildMode = "enabled"
-        });
+        return Ok(indexService.Status());
     }
 }

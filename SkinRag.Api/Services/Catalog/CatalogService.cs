@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SkinRag.Api.Data;
 using SkinRag.Api.Models;
 
-namespace SkinRag.Api.Services;
+namespace SkinRag.Api.Services.Catalog;
 
 public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory)
 {
