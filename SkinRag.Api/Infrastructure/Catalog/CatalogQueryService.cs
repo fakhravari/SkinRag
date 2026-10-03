@@ -200,7 +200,7 @@ public sealed class CatalogQueryService(IDbContextFactory<SkinRagDbContext> dbFa
                                                                     (x.Profile.Name != null && skinTypes.Contains(x.Profile.Name)) ||
                                                                     x.Profile.Slug == "skin-all"))
                                      || (!p.ProductProfiles.Any() && skinTypes.Any(skinType =>
-                                         p.SkinTypes.Contains(skinType))));
+                                         p.SkinTypes.Contains(skinType!))));
         }
 
         if (hairTypes.Length > 0)
@@ -210,7 +210,7 @@ public sealed class CatalogQueryService(IDbContextFactory<SkinRagDbContext> dbFa
                                                                     (x.Profile.Name != null && hairTypes.Contains(x.Profile.Name)) ||
                                                                     x.Profile.Slug == "hair-all"))
                                      || (!p.ProductProfiles.Any() && hairTypes.Any(hairType =>
-                                         p.HairTypes.Contains(hairType))));
+                                         p.HairTypes.Contains(hairType!))));
         }
 
         if (concernSlugs.Length > 0)

@@ -124,41 +124,51 @@ public sealed partial class QueryBuilder(
         if (request.FiltersOnly)
         {
             var terms = new List<string>();
-            if (request.Domain is { } selectedDomain)
+            foreach (var selectedDomain in request.Domains.Append(request.Domain)
+                         .Where(x => !string.IsNullOrWhiteSpace(x)).Distinct())
             {
                 terms.Add(vocabulary.Categories.FirstOrDefault(x => x.ParentId is null && x.Domain == selectedDomain)
-                    ?.Name ?? selectedDomain);
+                    ?.Name ?? selectedDomain!);
             }
 
-            if (request.CategorySlug is { } categorySlug &&
-                vocabulary.Categories.FirstOrDefault(x => x.Slug == categorySlug) is { } category)
+            foreach (var categorySlug in request.CategorySlugs.Append(request.CategorySlug)
+                         .Where(x => !string.IsNullOrWhiteSpace(x)).Distinct())
             {
-                terms.Add(category.Name);
+                if (vocabulary.Categories.FirstOrDefault(x => x.Slug == categorySlug) is { } category)
+                    terms.Add(category.Name);
             }
 
-            if (request.SkinType is { } skinType && vocabulary.Profiles.FirstOrDefault(x => x.Slug == skinType) is
-                    { } skinProfile)
+            foreach (var skinType in request.SkinTypes.Append(request.SkinType)
+                         .Where(x => !string.IsNullOrWhiteSpace(x)).Distinct())
             {
-                terms.Add(skinProfile.Name);
+                if (vocabulary.Profiles.FirstOrDefault(x => x.Slug == skinType) is { } skinProfile)
+                    terms.Add(skinProfile.Name);
             }
 
-            if (request.HairType is { } hairType && vocabulary.Profiles.FirstOrDefault(x => x.Slug == hairType) is
-                    { } hairProfile)
+            foreach (var hairType in request.HairTypes.Append(request.HairType)
+                         .Where(x => !string.IsNullOrWhiteSpace(x)).Distinct())
             {
-                terms.Add(hairProfile.Name);
+                if (vocabulary.Profiles.FirstOrDefault(x => x.Slug == hairType) is { } hairProfile)
+                    terms.Add(hairProfile.Name);
             }
 
-            if (request.BrandSlug is { } brandSlug && vocabulary.Brands.FirstOrDefault(x => x.Slug == brandSlug) is
-                    { } brand)
+            foreach (var brandSlug in request.BrandSlugs.Append(request.BrandSlug)
+                         .Where(x => !string.IsNullOrWhiteSpace(x)).Distinct())
             {
-                terms.Add(brand.Name);
+                if (vocabulary.Brands.FirstOrDefault(x => x.Slug == brandSlug) is { } brand)
+                    terms.Add(brand.Name);
             }
 
-            if (request.ConcernSlug is { } concernSlug &&
-                vocabulary.Concerns.FirstOrDefault(x => x.Slug == concernSlug) is { } concern)
+            foreach (var concernSlug in request.ConcernSlugs.Append(request.ConcernSlug)
+                         .Where(x => !string.IsNullOrWhiteSpace(x)).Distinct())
             {
-                terms.Add(concern.Name);
+                if (vocabulary.Concerns.FirstOrDefault(x => x.Slug == concernSlug) is { } concern)
+                    terms.Add(concern.Name);
             }
+
+            terms.AddRange(request.Shades.Append(request.Shade).Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!));
+            terms.AddRange(request.Finishes.Append(request.Finish).Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!));
+            if (request.FragranceFree == true) terms.Add("بدون عطر افزوده");
 
             if (terms.Count == 0)
             {
@@ -172,7 +182,7 @@ public sealed partial class QueryBuilder(
                 string.Join(" ", terms),
                 filterCopy,
                 ConsultationIntent.ProductSearch,
-                request.ConcernSlug is null ? [] : [request.ConcernSlug],
+                [],
                 request.MaxPrice.HasValue,
                 [],
                 Source: "filters-only"));

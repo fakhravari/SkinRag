@@ -373,8 +373,6 @@
                         $("<span>")
                             .addClass("pill product-category-badge")
                             .text(p.category || app.domainNames[p.domain] || "محصول"),
-                        $("<span>").addClass("product-availability-badge")
-                            .append(app.icon("check"), $("<span>").text("موجود")),
                         $("<span>")
                             .addClass("product-id")
                             .text("#" + p.id),
@@ -408,9 +406,13 @@
                     .append($("<small>").text("ریال"));
                 if ((p.variants || []).length > 1)
                     $price.prepend($("<span>").addClass("product-price-label").text("شروع از "));
-                var $stock = $("<p>")
+                var $stock = $("<div>")
                     .addClass("product-stock")
-                    .text(app.number(p.stockQuantity) + " عدد موجود در تنوع‌های مطابق درخواست");
+                    .append(
+                        app.icon("check"),
+                        $("<span>").text("موجودی انبار"),
+                        $("<b>").text(app.number(p.stockQuantity) + " عدد"),
+                    );
                 $card.append(
                     $top,
                     $main,
