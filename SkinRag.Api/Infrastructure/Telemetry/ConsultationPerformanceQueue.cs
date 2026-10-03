@@ -1,20 +1,18 @@
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
-using SkinRag.Api.Infrastructure.Persistence;
 using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Telemetry;
+using SkinRag.Api.Infrastructure.Persistence;
 
 namespace SkinRag.Api.Infrastructure.Telemetry;
 
-public sealed class ConsultationPerformanceQueue(IDbContextFactory<SkinRagDbContext> dbFactory, ILogger<ConsultationPerformanceQueue> logger) : BackgroundService, IConsultationPerformanceSink
+public sealed class ConsultationPerformanceQueue(
+    IDbContextFactory<SkinRagDbContext> dbFactory,
+    ILogger<ConsultationPerformanceQueue> logger) : BackgroundService, IConsultationPerformanceSink
 {
     private readonly Channel<ConsultationPerformanceLog> _queue = Channel.CreateBounded<ConsultationPerformanceLog>(
         new BoundedChannelOptions(5000)
-        {
-            FullMode = BoundedChannelFullMode.Wait,
-            SingleReader = true,
-            SingleWriter = false
-        });
+            { FullMode = BoundedChannelFullMode.Wait, SingleReader = true, SingleWriter = false });
 
     public void Enqueue(ConsultationPerformanceLog item)
     {
@@ -39,6 +37,7 @@ public sealed class ConsultationPerformanceQueue(IDbContextFactory<SkinRagDbCont
                 try
                 {
                     await using var db = await dbFactory.CreateDbContextAsync(stoppingToken);
+                    db.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.TrackAll;
                     db.ConsultationPerformanceLogs.AddRange(batch);
                     await db.SaveChangesAsync(stoppingToken);
                 }

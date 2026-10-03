@@ -26,10 +26,16 @@ public static class ModelCallTelemetry
         return new Scope(previous);
     }
 
-    public static void Record(ModelCallMetric metric) => CurrentCalls.Value?.Enqueue(metric);
+    public static void Record(ModelCallMetric metric)
+    {
+        CurrentCalls.Value?.Enqueue(metric);
+    }
 
     private sealed class Scope(ConcurrentQueue<ModelCallMetric>? previous) : IDisposable
     {
-        public void Dispose() => CurrentCalls.Value = previous;
+        public void Dispose()
+        {
+            CurrentCalls.Value = previous;
+        }
     }
 }

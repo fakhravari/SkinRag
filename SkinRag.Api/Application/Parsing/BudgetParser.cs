@@ -20,7 +20,8 @@ public sealed record ParsedBudget(BudgetStatus Status, decimal? MaximumPriceRial
     public string? FollowUpQuestion => Status switch
     {
         BudgetStatus.MissingCurrency => "مبلغ بودجه را با واحد ریال یا تومان می‌فرمایید؟",
-        BudgetStatus.Ambiguous => "مبلغ‌ها یا بازهٔ قیمتی با هم سازگار نیستند؛ لطفاً حداقل و حداکثر بودجه را مشخص کنید.",
+        BudgetStatus.Ambiguous =>
+            "مبلغ‌ها یا بازهٔ قیمتی با هم سازگار نیستند؛ لطفاً حداقل و حداکثر بودجه را مشخص کنید.",
         _ => null
     };
 }
@@ -30,12 +31,16 @@ public static partial class BudgetParser
 {
     public const decimal MaximumAllowedRials = 1_000_000_000m;
 
-    private const string Amount = @"(?<amount>[+-]?[0-9]+(?:[.,٫٬][0-9]+)*)\s*(?<scale>هزار|میلیون|میلیارد)?\s*(?<currency>تومان|تومن|ریال)?(?![\p{L}\p{N}])";
+    private const string Amount =
+        @"(?<amount>[+-]?[0-9]+(?:[.,٫٬][0-9]+)*)\s*(?<scale>هزار|میلیون|میلیارد)?\s*(?<currency>تومان|تومن|ریال)?(?![\p{L}\p{N}])";
 
-    [GeneratedRegex(@"(?<![\p{L}\p{N}])(?:بین|از)\s*(?<lowAmount>[+-]?[0-9]+(?:[.,٫٬][0-9]+)*)\s*(?<lowScale>هزار|میلیون|میلیارد)?\s*(?<lowCurrency>تومان|تومن|ریال)?\s*(?:تا|الی)\s*(?<highAmount>[+-]?[0-9]+(?:[.,٫٬][0-9]+)*)\s*(?<highScale>هزار|میلیون|میلیارد)?\s*(?<highCurrency>تومان|تومن|ریال)?(?![\p{L}\p{N}])")]
+    [GeneratedRegex(
+        @"(?<![\p{L}\p{N}])(?:بین|از)\s*(?<lowAmount>[+-]?[0-9]+(?:[.,٫٬][0-9]+)*)\s*(?<lowScale>هزار|میلیون|میلیارد)?\s*(?<lowCurrency>تومان|تومن|ریال)?\s*(?:تا|الی)\s*(?<highAmount>[+-]?[0-9]+(?:[.,٫٬][0-9]+)*)\s*(?<highScale>هزار|میلیون|میلیارد)?\s*(?<highCurrency>تومان|تومن|ریال)?(?![\p{L}\p{N}])")]
     private static partial Regex BudgetRange();
 
-    [GeneratedRegex(@"(?<![\p{L}\p{N}])(?:تا|زیر|حداکثر|بودجه(?:\s+(?:من|ام))?(?:\s+(?:تا|است|هست|حدود))?|سقف(?:\s+قیمت)?|با\s+بودجه)\s*(?:قیمت\s*)?" + Amount)]
+    [GeneratedRegex(
+        @"(?<![\p{L}\p{N}])(?:تا|زیر|حداکثر|بودجه(?:\s+(?:من|ام))?(?:\s+(?:تا|است|هست|حدود))?|سقف(?:\s+قیمت)?|با\s+بودجه)\s*(?:قیمت\s*)?" +
+        Amount)]
     private static partial Regex BudgetLimit();
 
     [GeneratedRegex(@"(?<![\p{L}\p{N}])من\s+(?:(?:فقط|حدود|تقریبا)\s+)*" + Amount + @"\s*(?:پول\s+)?دارم\b")]
@@ -71,30 +76,31 @@ public static partial class BudgetParser
             lowScale = lowScale.Length == 0 ? highScale : lowScale;
             highScale = highScale.Length == 0 ? lowScale : highScale;
             var rangeIsBudgetOnly = SocialPrefix().IsMatch(text[..range.Index].Trim())
-                && BudgetSuffix().IsMatch(text[(range.Index + range.Length)..].Trim());
+                                    && BudgetSuffix().IsMatch(text[(range.Index + range.Length)..].Trim());
             if (lowCurrency.Length == 0 || highCurrency.Length == 0)
             {
-                return new(BudgetStatus.MissingCurrency, IsBudgetOnly: rangeIsBudgetOnly);
+                return new ParsedBudget(BudgetStatus.MissingCurrency, IsBudgetOnly: rangeIsBudgetOnly);
             }
 
             var minimum = ConvertToRials(range.Groups["lowAmount"].Value, lowScale, lowCurrency);
             var maximum = ConvertToRials(range.Groups["highAmount"].Value, highScale, highCurrency);
             return minimum <= maximum
-                ? new(BudgetStatus.Valid, maximum, rangeIsBudgetOnly) { MinimumPriceRials = minimum }
-                : new(BudgetStatus.Ambiguous, IsBudgetOnly: rangeIsBudgetOnly);
+                ? new ParsedBudget(BudgetStatus.Valid, maximum, rangeIsBudgetOnly) { MinimumPriceRials = minimum }
+                : new ParsedBudget(BudgetStatus.Ambiguous, IsBudgetOnly: rangeIsBudgetOnly);
         }
 
-        var matches = BudgetLimit().Matches(text).Cast<Match>()
-            .Concat(AvailableMoney().Matches(text).Cast<Match>())
+        var matches = BudgetLimit().Matches(text)
+            .Concat(AvailableMoney().Matches(text))
             .Where(m => m.Groups["currency"].Length > 0
-                || !NonMoneyUnit().IsMatch(text[(m.Index + m.Length)..].TrimStart())).ToArray();
+                        || !NonMoneyUnit().IsMatch(text[(m.Index + m.Length)..].TrimStart())).ToArray();
         if (matches.Length == 0)
         {
             var standalone = StandaloneAmount().Match(text);
             if (!standalone.Success || (standalone.Groups["currency"].Length == 0
-                && standalone.Groups["scale"].Length == 0 && !text.Contains("دارم", StringComparison.Ordinal)))
+                                        && standalone.Groups["scale"].Length == 0 &&
+                                        !text.Contains("دارم", StringComparison.Ordinal)))
             {
-                return new(BudgetStatus.None);
+                return new ParsedBudget(BudgetStatus.None);
             }
 
             matches = [standalone];
@@ -103,21 +109,22 @@ public static partial class BudgetParser
         var firstMatch = matches.MinBy(m => m.Index)!;
         var lastMatch = matches.MaxBy(m => m.Index + m.Length)!;
         var isBudgetOnly = SocialPrefix().IsMatch(text[..firstMatch.Index].Trim())
-            && BudgetSuffix().IsMatch(text[(lastMatch.Index + lastMatch.Length)..].Trim());
+                           && BudgetSuffix().IsMatch(text[(lastMatch.Index + lastMatch.Length)..].Trim());
         if (matches.Any(m => m.Groups["currency"].Length == 0))
         {
-            return new(BudgetStatus.MissingCurrency, IsBudgetOnly: isBudgetOnly);
+            return new ParsedBudget(BudgetStatus.MissingCurrency, IsBudgetOnly: isBudgetOnly);
         }
 
         var amounts = matches.Select(ConvertToRials).Distinct().ToArray();
         return amounts.Length == 1
-            ? new(BudgetStatus.Valid, amounts[0], isBudgetOnly)
-            : new(BudgetStatus.Ambiguous, IsBudgetOnly: isBudgetOnly);
+            ? new ParsedBudget(BudgetStatus.Valid, amounts[0], isBudgetOnly)
+            : new ParsedBudget(BudgetStatus.Ambiguous, IsBudgetOnly: isBudgetOnly);
     }
 
     private static decimal ConvertToRials(Match match)
     {
-        return ConvertToRials(match.Groups["amount"].Value, match.Groups["scale"].Value, match.Groups["currency"].Value);
+        return ConvertToRials(match.Groups["amount"].Value, match.Groups["scale"].Value,
+            match.Groups["currency"].Value);
     }
 
     private static decimal ConvertToRials(string value, string scale, string currency)
@@ -126,29 +133,45 @@ public static partial class BudgetParser
         if (number.Contains('٫'))
         {
             if (number.Contains(',') || number.Contains('.') || number.Contains('٬'))
+            {
                 throw new ArgumentException("جداکننده‌های مبلغ را با یک قالب یکسان بنویسید.");
+            }
+
             number = number.Replace('٫', '.');
         }
         else if (number.Contains('٬'))
         {
             if (number.Contains(',') || number.Contains('.') || !GroupedNumber().IsMatch(number))
+            {
                 throw new ArgumentException("قالب جداکنندهٔ هزارگان مبلغ معتبر نیست.");
+            }
+
             number = number.Replace("٬", "");
         }
         else if (number.Contains(',') || number.Contains('.'))
         {
             var separator = number.Contains(',') ? ',' : '.';
             if (number.Contains(',') && number.Contains('.'))
+            {
                 throw new ArgumentException("جداکننده‌های مبلغ را با یک قالب یکسان بنویسید.");
+            }
+
             if (GroupedNumber().IsMatch(number))
+            {
                 number = number.Replace(separator.ToString(), "");
+            }
             else if (number.Count(c => c == separator) > 1)
+            {
                 throw new ArgumentException("قالب جداکنندهٔ مبلغ معتبر نیست.");
+            }
             else
+            {
                 number = number.Replace(separator, '.');
+            }
         }
+
         if (!decimal.TryParse(number, NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingSign,
-            CultureInfo.InvariantCulture, out var amount) || amount < 0)
+                CultureInfo.InvariantCulture, out var amount) || amount < 0)
         {
             throw new ArgumentException("مبلغ بودجه نامعتبر است.");
         }

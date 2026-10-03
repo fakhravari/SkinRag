@@ -25,6 +25,12 @@ public sealed class SkinRagDbContext(DbContextOptions<SkinRagDbContext> options)
 
     public DbSet<ConsultationPerformanceLog> ConsultationPerformanceLogs => Set<ConsultationPerformanceLog>();
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        optionsBuilder.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
+        base.OnConfiguring(optionsBuilder);
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -52,12 +58,17 @@ public sealed class SkinRagDbContext(DbContextOptions<SkinRagDbContext> options)
             entity.Property(x => x.Currency).HasMaxLength(3).HasDefaultValue("IRR");
             entity.Property(x => x.Image).HasColumnType("nvarchar(max)");
             entity.Property(x => x.UpdatedAtUtc).HasDefaultValueSql("SYSUTCDATETIME()");
-            entity.HasOne(x => x.CategoryDetails).WithMany().HasForeignKey(x => x.CategoryId).IsRequired().OnDelete(DeleteBehavior.NoAction);
-            entity.HasOne(x => x.BrandDetails).WithMany().HasForeignKey(x => x.BrandId).IsRequired().OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne(x => x.CategoryDetails).WithMany().HasForeignKey(x => x.CategoryId).IsRequired()
+                .OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne(x => x.BrandDetails).WithMany().HasForeignKey(x => x.BrandId).IsRequired()
+                .OnDelete(DeleteBehavior.NoAction);
             entity.HasMany(x => x.Variants).WithOne().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.NoAction);
-            entity.HasMany(x => x.ProductProfiles).WithOne().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.NoAction);
-            entity.HasMany(x => x.ProductConcerns).WithOne().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.NoAction);
-            entity.HasMany(x => x.ProductIngredients).WithOne().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.NoAction);
+            entity.HasMany(x => x.ProductProfiles).WithOne().HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.NoAction);
+            entity.HasMany(x => x.ProductConcerns).WithOne().HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.NoAction);
+            entity.HasMany(x => x.ProductIngredients).WithOne().HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
         modelBuilder.Entity<Category>().ToTable("Categories");
         modelBuilder.Entity<Category>().HasOne(x => x.Parent).WithMany().HasForeignKey(x => x.ParentId)
@@ -66,25 +77,14 @@ public sealed class SkinRagDbContext(DbContextOptions<SkinRagDbContext> options)
         modelBuilder.Entity<Profile>().ToTable("Profiles");
         modelBuilder.Entity<Concern>().ToTable("Concerns");
         modelBuilder.Entity<Ingredient>().ToTable("Ingredients");
-        modelBuilder.Entity<ProductProfile>().ToTable("ProductProfiles").HasKey(x => new
-        {
-            x.ProductId,
-            x.ProfileId
-        });
+        modelBuilder.Entity<ProductProfile>().ToTable("ProductProfiles").HasKey(x => new { x.ProductId, x.ProfileId });
         modelBuilder.Entity<ProductProfile>().HasOne(x => x.Profile).WithMany().HasForeignKey(x => x.ProfileId)
             .OnDelete(DeleteBehavior.NoAction);
-        modelBuilder.Entity<ProductConcern>().ToTable("ProductConcerns").HasKey(x => new
-        {
-            x.ProductId,
-            x.ConcernId
-        });
+        modelBuilder.Entity<ProductConcern>().ToTable("ProductConcerns").HasKey(x => new { x.ProductId, x.ConcernId });
         modelBuilder.Entity<ProductConcern>().HasOne(x => x.Concern).WithMany().HasForeignKey(x => x.ConcernId)
             .OnDelete(DeleteBehavior.NoAction);
-        modelBuilder.Entity<ProductIngredient>().ToTable("ProductIngredients").HasKey(x => new
-        {
-            x.ProductId,
-            x.IngredientId
-        });
+        modelBuilder.Entity<ProductIngredient>().ToTable("ProductIngredients")
+            .HasKey(x => new { x.ProductId, x.IngredientId });
         modelBuilder.Entity<ProductIngredient>().HasOne(x => x.Ingredient).WithMany().HasForeignKey(x => x.IngredientId)
             .OnDelete(DeleteBehavior.NoAction);
         modelBuilder.Entity<ProductVariant>(entity =>
@@ -97,11 +97,7 @@ public sealed class SkinRagDbContext(DbContextOptions<SkinRagDbContext> options)
         });
         modelBuilder.Entity<ProductEmbedding>(entity =>
         {
-            entity.ToTable("ProductEmbeddings").HasKey(x => new
-            {
-                x.ProductId,
-                x.Model
-            });
+            entity.ToTable("ProductEmbeddings").HasKey(x => new { x.ProductId, x.Model });
             entity.Property(x => x.Model).HasMaxLength(100);
             entity.Property(x => x.ContentHash).HasMaxLength(64);
             entity.Property(x => x.UpdatedAtUtc).HasDefaultValueSql("SYSUTCDATETIME()");

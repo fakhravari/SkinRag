@@ -4,10 +4,10 @@ using SkinRag.Api.Application.Consultation;
 using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Application.Retrieval;
 using SkinRag.Api.Application.Validation;
-using SkinRag.Api.Infrastructure.Persistence;
-using SkinRag.Api.Infrastructure.Integrations.Ollama;
 using SkinRag.Api.Infrastructure.Catalog;
+using SkinRag.Api.Infrastructure.Integrations.Ollama;
 using SkinRag.Api.Infrastructure.Knowledge;
+using SkinRag.Api.Infrastructure.Persistence;
 using SkinRag.Api.Infrastructure.Telemetry;
 using SkinRag.Api.Presentation.Middleware;
 
@@ -35,7 +35,8 @@ public static class ServiceCollectionExtensions
 
     private static void AddDataServices(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDbContextFactory<SkinRagDbContext>(options => options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
+        services.AddDbContextFactory<SkinRagDbContext>(options =>
+            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<CatalogQueryService>();
         services.AddScoped<ICatalogQueryService>(provider => provider.GetRequiredService<CatalogQueryService>());
@@ -55,7 +56,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IKnowledgeIndex>(provider => provider.GetRequiredService<KnowledgeIndexService>());
         services.AddHostedService<KnowledgeIndexBackgroundService>();
         services.AddSingleton<ConsultationPerformanceQueue>();
-        services.AddSingleton<IConsultationPerformanceSink>(provider => provider.GetRequiredService<ConsultationPerformanceQueue>());
+        services.AddSingleton<IConsultationPerformanceSink>(provider =>
+            provider.GetRequiredService<ConsultationPerformanceQueue>());
         services.AddHostedService(provider => provider.GetRequiredService<ConsultationPerformanceQueue>());
     }
 

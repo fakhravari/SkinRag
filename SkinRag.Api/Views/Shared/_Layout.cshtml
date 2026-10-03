@@ -3,58 +3,57 @@
 }
 <!doctype html>
 <html lang="fa" dir="rtl">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width,initial-scale=1" />
-        <meta name="theme-color" content="#7152bd" />
-        <title>@ViewData["Title"] | SkinRag</title>
-        <link rel="icon" href="data:," />
-        <link
-            rel="preload"
-            href="/fonts/Vazirmatn-Variable.woff2"
-            as="font"
-            type="font/woff2"
-            crossorigin
-        />
-        <link rel="stylesheet" href="~/assets/app.css" asp-append-version="true" />
-        <script src="~/vendor/jquery-4.0.0.min.js" asp-append-version="true" defer></script>
-        <script src="~/assets/common.js" asp-append-version="true" defer></script>
-        @await RenderSectionAsync("Scripts", required: false)
-    </head>
-    <body>
-        <header class="topbar">
-            <div class="container topbar-inner">
-                <a class="brand" href="/chat" aria-label="SkinRag، صفحه گفت‌وگو">
-                    <span class="brand-mark">
-                        <svg class="icon" aria-hidden="true">
-                            <use href="/assets/icons.svg#sparkles" />
-                        </svg>
-                    </span>
-                    <span>
-                        <span class="brand-name latin">SkinRag</span>
-                        <span class="brand-caption" style="display: block">مراقبت، آگاهانه</span>
-                    </span>
-                </a>
-                <nav class="nav" aria-label="صفحات اصلی">
-                    <a href="/chat" class="@(page == "Chat" ? "active" : "")" aria-current="@(page == "Chat" ? "page" : null)">
-                        <svg class="icon" aria-hidden="true">
-                            <use href="/assets/icons.svg#chat" />
-                        </svg>
-                        گفت‌وگوی مراقبت
-                    </a>
-                    <a href="/admin" class="@(page == "Admin" ? "active" : "")" aria-current="@(page == "Admin" ? "page" : null)">
-                        <svg class="icon" aria-hidden="true">
-                            <use href="/assets/icons.svg#activity" />
-                        </svg>
-                        مدیریت دانش
-                    </a>
-                </nav>
-                <span class="pill warn">
-                    <span class="dot"></span>
-                    محیط آزمایشی
-                </span>
-            </div>
-        </header>
-        @RenderBody()
-    </body>
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="theme-color" content="#7152bd"/>
+    <title>@ViewData["Title"] | SkinRag</title>
+    <link rel="icon" href="data:,"/>
+    <link
+        rel="preload"
+        href="/fonts/Vazirmatn-Variable.woff2"
+        as="font"
+        type="font/woff2"
+        crossorigin/>
+    <link rel="stylesheet" href="~/assets/app.css" asp-append-version="true"/>
+    <script src="~/vendor/jquery-4.0.0.min.js" asp-append-version="true" defer></script>
+    <script src="~/assets/common.js" asp-append-version="true" defer></script>
+    @await RenderSectionAsync("Scripts", false)
+</head>
+<body>
+<header class="topbar">
+    <div class="container topbar-inner">
+        <a class="brand" href="/chat" aria-label="SkinRag، صفحه گفت‌وگو">
+            <span class="brand-mark">
+                <svg class="icon" aria-hidden="true">
+                    <use href="/assets/icons.svg#sparkles"/>
+                </svg>
+            </span>
+            <span>
+                <span class="brand-name latin">SkinRag</span>
+                <span class="brand-caption" style="display: block">مراقبت، آگاهانه</span>
+            </span>
+        </a>
+        <nav class="nav" aria-label="صفحات اصلی">
+            <a href="/chat" class="@(page == "Chat" ? "active" : "")" aria-current="@(page == "Chat" ? "page" : null)">
+                <svg class="icon" aria-hidden="true">
+                    <use href="/assets/icons.svg#chat"/>
+                </svg>
+                گفت‌وگوی مراقبت
+            </a>
+            <a href="/admin" class="@(page == "Admin" ? "active" : "")" aria-current="@(page == "Admin" ? "page" : null)">
+                <svg class="icon" aria-hidden="true">
+                    <use href="/assets/icons.svg#activity"/>
+                </svg>
+                مدیریت دانش
+            </a>
+        </nav>
+        <span class="pill warn">
+            <span class="dot"></span>
+            محیط آزمایشی
+        </span>
+    </div>
+</header>
+@RenderBody()
+</body>
 </html>

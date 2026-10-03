@@ -1,6 +1,9 @@
 namespace SkinRag.Api.Infrastructure.Knowledge;
 
-public sealed class KnowledgeIndexBackgroundService(KnowledgeIndexService index, IConfiguration configuration, ILogger<KnowledgeIndexBackgroundService> logger) : BackgroundService
+public sealed class KnowledgeIndexBackgroundService(
+    KnowledgeIndexService index,
+    IConfiguration configuration,
+    ILogger<KnowledgeIndexBackgroundService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -23,8 +26,8 @@ public sealed class KnowledgeIndexBackgroundService(KnowledgeIndexService index,
             try
             {
                 await Task.Delay(
-                    TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue("Rag:RefreshIntervalSeconds", 300), 30, 86400)),
-                    stoppingToken);
+                    TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue("Rag:RefreshIntervalSeconds", 300), 30,
+                        86400)), stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

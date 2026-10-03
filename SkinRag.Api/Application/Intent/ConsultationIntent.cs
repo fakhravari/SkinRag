@@ -50,6 +50,13 @@ public static class IntentCodes
 
     public static string[] All => Codes.Keys.ToArray();
 
-    public static bool TryParse(string code, out ConsultationIntent intent) => Codes.TryGetValue(code, out intent);
-    public static string ToCode(ConsultationIntent intent) => Codes.Single(x => x.Value == intent).Key;
+    public static bool TryParse(string code, out ConsultationIntent intent)
+    {
+        return Codes.TryGetValue(code, out intent);
+    }
+
+    public static string ToCode(ConsultationIntent intent)
+    {
+        return Codes.Single(x => x.Value == intent).Key;
+    }
 }

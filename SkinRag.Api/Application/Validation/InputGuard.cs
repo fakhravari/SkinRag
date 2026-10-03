@@ -18,26 +18,26 @@ public sealed partial class InputGuard
     {
         if (string.IsNullOrWhiteSpace(text))
         {
-            return new(false, "EMPTY", "پیام نمی‌تواند خالی باشد.");
+            return new GuardResult(false, "EMPTY", "پیام نمی‌تواند خالی باشد.");
         }
 
         if (text.Length > 2000)
         {
-            return new(false, "TOO_LONG", "پیام باید حداکثر ۲۰۰۰ نویسه باشد.");
+            return new GuardResult(false, "TOO_LONG", "پیام باید حداکثر ۲۰۰۰ نویسه باشد.");
         }
 
         if (!text.Any(char.IsLetterOrDigit) || RepeatedCharacter().IsMatch(text))
         {
-            return new(false, "SPAM", "لطفاً یک پرسش خوانا درباره محصولات بنویسید.");
+            return new GuardResult(false, "SPAM", "لطفاً یک پرسش خوانا درباره محصولات بنویسید.");
         }
 
         var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (words.Length >= 16
             && words.GroupBy(x => x, StringComparer.OrdinalIgnoreCase).Max(x => x.Count()) > words.Length * .8)
         {
-            return new(false, "SPAM", "پیام شامل تکرار بیش از حد است؛ پرسش را کوتاه‌تر بنویسید.");
+            return new GuardResult(false, "SPAM", "پیام شامل تکرار بیش از حد است؛ پرسش را کوتاه‌تر بنویسید.");
         }
 
-        return new(true);
+        return new GuardResult(true);
     }
 }

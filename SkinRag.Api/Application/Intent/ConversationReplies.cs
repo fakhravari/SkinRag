@@ -6,18 +6,6 @@ namespace SkinRag.Api.Application.Intent;
 
 public static partial class ConversationReplies
 {
-    private enum Intent
-    {
-        None,
-        Greeting,
-        Wellbeing,
-        Thanks,
-        Farewell,
-        About,
-        Location,
-        DailyPlans
-    }
-
     private static readonly FrozenDictionary<string, Intent> Phrases = new Dictionary<string, Intent>
     {
         ["سلام"] = Intent.Greeting,
@@ -80,11 +68,15 @@ public static partial class ConversationReplies
     [GeneratedRegex(@"(\p{L})\1{2,}")]
     private static partial Regex RepeatedLetters();
 
-    public static string? GetReply(string question) => GetTopic(question) is { } topic ? ReplyForTopic(topic) : null;
+    public static string? GetReply(string question)
+    {
+        return GetTopic(question) is { } topic ? ReplyForTopic(topic) : null;
+    }
 
     public static ConversationTopic? GetTopic(string question)
     {
-        var words = RepeatedLetters().Replace(PersianText.Normalize(question), "$1").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var words = RepeatedLetters().Replace(PersianText.Normalize(question), "$1")
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (words.Length is 0 or > 24)
         {
             return null;
@@ -131,26 +123,50 @@ public static partial class ConversationReplies
         };
     }
 
-    public static string ReplyForTopic(ConversationTopic topic) => topic switch
+    public static string ReplyForTopic(ConversationTopic topic)
     {
-        ConversationTopic.Greeting => "سلام! خوش آمدید 🌿 چطور می‌توانم کمکتان کنم؟",
-        ConversationTopic.Wellbeing => "ممنون که پرسیدید! آماده‌ام با شما گپ بزنم و کمکتان کنم. شما چطورید؟",
-        ConversationTopic.Identity => "من SkinRag، یک دستیار هوش مصنوعی هستم. سن، بدن یا زندگی شخصی ندارم؛ می‌توانم با شما گپ بزنم و در پیدا کردن محصولات مراقبتی کمک کنم.",
-        ConversationTopic.Location => "من یک دستیار هوش مصنوعی‌ام و محل زندگی یا خانه‌ای ندارم؛ از همین گفت‌وگو با شما در ارتباطم.",
-        ConversationTopic.DailyPlans => "برنامه روزانه شخصی ندارم؛ اینجا هستم تا با شما گفت‌وگو کنم و کمکتان کنم. شما برای امروز چه برنامه‌ای دارید؟",
-        ConversationTopic.Capabilities => "می‌توانم با شما گپ بزنم و محصولات پوست، مو و زیبایی را بر اساس نیازتان بررسی کنم. قیمت، موجودی و مشخصات محصول را از کاتالوگ می‌خوانم.",
-        ConversationTopic.Thanks => "خواهش می‌کنم! خوشحال می‌شوم اگر باز هم کمکی از دستم بربیاید.",
-        ConversationTopic.Farewell => "خدانگهدار! هر وقت خواستید، گفت‌وگو را ادامه می‌دهیم 🌿",
-        _ => "می‌توانیم کمی گپ بزنیم. دوست دارید درباره چه موضوعی صحبت کنیم؟"
-    };
+        return topic switch
+        {
+            ConversationTopic.Greeting => "سلام! خوش آمدید 🌿 چطور می‌توانم کمکتان کنم؟",
+            ConversationTopic.Wellbeing => "ممنون که پرسیدید! آماده‌ام با شما گپ بزنم و کمکتان کنم. شما چطورید؟",
+            ConversationTopic.Identity =>
+                "من SkinRag، یک دستیار هوش مصنوعی هستم. سن، بدن یا زندگی شخصی ندارم؛ می‌توانم با شما گپ بزنم و در پیدا کردن محصولات مراقبتی کمک کنم.",
+            ConversationTopic.Location =>
+                "من یک دستیار هوش مصنوعی‌ام و محل زندگی یا خانه‌ای ندارم؛ از همین گفت‌وگو با شما در ارتباطم.",
+            ConversationTopic.DailyPlans =>
+                "برنامه روزانه شخصی ندارم؛ اینجا هستم تا با شما گفت‌وگو کنم و کمکتان کنم. شما برای امروز چه برنامه‌ای دارید؟",
+            ConversationTopic.Capabilities =>
+                "می‌توانم با شما گپ بزنم و محصولات پوست، مو و زیبایی را بر اساس نیازتان بررسی کنم. قیمت، موجودی و مشخصات محصول را از کاتالوگ می‌خوانم.",
+            ConversationTopic.Thanks => "خواهش می‌کنم! خوشحال می‌شوم اگر باز هم کمکی از دستم بربیاید.",
+            ConversationTopic.Farewell => "خدانگهدار! هر وقت خواستید، گفت‌وگو را ادامه می‌دهیم 🌿",
+            _ => "می‌توانیم کمی گپ بزنیم. دوست دارید درباره چه موضوعی صحبت کنیم؟"
+        };
+    }
 
-    public static string ClarificationFor(ClarificationKind? kind) => kind switch
+    public static string ClarificationFor(ClarificationKind? kind)
     {
-        ClarificationKind.ProductReference => "منظورتان کدام محصول است؟ نام یا شناسه آن را می‌فرمایید؟",
-        ClarificationKind.ProductType => "دنبال چه نوع محصولی هستید؛ مثلاً شوینده، مرطوب‌کننده، شامپو یا یک محصول آرایشی؟",
-        ClarificationKind.Preferences => "برای انتخاب دقیق‌تر، نیاز اصلی و نوع پوست یا مویتان را می‌فرمایید؟ بودجه هم اگر مدنظرتان است بگویید.",
-        ClarificationKind.BudgetCurrency => "مبلغ بودجه را با واحد ریال یا تومان می‌فرمایید؟",
-        ClarificationKind.BudgetAmount => "سقف بودجه موردنظرتان کدام مبلغ است؟ لطفاً مبلغ و واحد را مشخص کنید.",
-        _ => "کمی بیشتر توضیح می‌دهید منظورتان چیست؟ می‌خواهید گپ بزنیم یا درباره محصولی کمک می‌خواهید؟"
-    };
+        return kind switch
+        {
+            ClarificationKind.ProductReference => "منظورتان کدام محصول است؟ نام یا شناسه آن را می‌فرمایید؟",
+            ClarificationKind.ProductType =>
+                "دنبال چه نوع محصولی هستید؛ مثلاً شوینده، مرطوب‌کننده، شامپو یا یک محصول آرایشی؟",
+            ClarificationKind.Preferences =>
+                "برای انتخاب دقیق‌تر، نیاز اصلی و نوع پوست یا مویتان را می‌فرمایید؟ بودجه هم اگر مدنظرتان است بگویید.",
+            ClarificationKind.BudgetCurrency => "مبلغ بودجه را با واحد ریال یا تومان می‌فرمایید؟",
+            ClarificationKind.BudgetAmount => "سقف بودجه موردنظرتان کدام مبلغ است؟ لطفاً مبلغ و واحد را مشخص کنید.",
+            _ => "کمی بیشتر توضیح می‌دهید منظورتان چیست؟ می‌خواهید گپ بزنیم یا درباره محصولی کمک می‌خواهید؟"
+        };
+    }
+
+    private enum Intent
+    {
+        None,
+        Greeting,
+        Wellbeing,
+        Thanks,
+        Farewell,
+        About,
+        Location,
+        DailyPlans
+    }
 }

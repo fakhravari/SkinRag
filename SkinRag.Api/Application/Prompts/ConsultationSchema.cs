@@ -1,8 +1,6 @@
 using System.Text.Json;
 using SkinRag.Api.Application.Consultation;
 using SkinRag.Api.Application.Contracts.Catalog;
-using SkinRag.Api.Application.Contracts.Consultation;
-using SkinRag.Api.Domain.Catalog;
 
 namespace SkinRag.Api.Application.Prompts;
 
@@ -10,7 +8,8 @@ internal static class ConsultationSchema
 {
     public static JsonElement Create(IReadOnlyList<ProductMatch> context)
     {
-        var reasons = new[] {
+        var reasons = new[]
+        {
             GroundedAnswers.ReasonCode
         };
         return PipelinePrompts.Schema(new

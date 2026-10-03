@@ -6,7 +6,14 @@ namespace SkinRag.Api.Presentation.Controllers;
 public sealed class PagesController : Controller
 {
     [HttpGet("/chat")]
-    public IActionResult Chat() => View();
+    public IActionResult Chat()
+    {
+        return View();
+    }
+
     [HttpGet("/admin")]
-    public IActionResult Admin() => View();
+    public IActionResult Admin()
+    {
+        return View();
+    }
 }

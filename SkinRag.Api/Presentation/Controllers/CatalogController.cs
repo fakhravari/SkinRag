@@ -9,7 +9,11 @@ namespace SkinRag.Api.Presentation.Controllers;
 public sealed class CatalogController(ICatalogQueryService catalog) : ControllerBase
 {
     [HttpGet("products")]
-    public async Task<ActionResult<CatalogPage>> Products([FromQuery] CatalogSearchRequest request, CancellationToken ct) => Ok(await catalog.SearchAsync(request, ct));
+    public async Task<ActionResult<CatalogPage>> Products([FromQuery] CatalogSearchRequest request,
+        CancellationToken ct)
+    {
+        return Ok(await catalog.SearchAsync(request, ct));
+    }
 
     [HttpGet("products/{id:int}")]
     public async Task<ActionResult<ProductDto>> Product(int id, CancellationToken ct)
@@ -19,8 +23,14 @@ public sealed class CatalogController(ICatalogQueryService catalog) : Controller
     }
 
     [HttpGet("filters")]
-    public async Task<ActionResult<CatalogFilterOptions>> Filters(CancellationToken ct) => Ok(await catalog.GetFiltersAsync(ct));
+    public async Task<ActionResult<CatalogFilterOptions>> Filters(CancellationToken ct)
+    {
+        return Ok(await catalog.GetFiltersAsync(ct));
+    }
 
     [HttpGet("stats")]
-    public async Task<ActionResult<CatalogStatistics>> Stats(CancellationToken ct) => Ok(await catalog.GetStatisticsAsync(ct));
+    public async Task<ActionResult<CatalogStatistics>> Stats(CancellationToken ct)
+    {
+        return Ok(await catalog.GetStatisticsAsync(ct));
+    }
 }

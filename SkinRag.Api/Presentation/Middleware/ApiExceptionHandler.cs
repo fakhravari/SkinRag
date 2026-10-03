@@ -24,10 +24,7 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
             OperationCanceledException => (504, "زمان انتظار برای سرویس به پایان رسید."),
             _ => (500, "خطای داخلی رخ داد؛ گزارش سرور را بررسی کنید.")
         };
-        logger.LogError(
-            exception,
-            "API request failed with status {Status}; trace {Trace}",
-            status,
+        logger.LogError(exception, "API request failed with status {Status}; trace {Trace}", status,
             context.TraceIdentifier);
         context.Response.StatusCode = status;
         if (status == 503)
@@ -47,7 +44,7 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
                     ["code"] = exception is InputRejectedException input ? input.Code : null
                 }
             },
-            cancellationToken: ct);
+            ct);
         return true;
     }
 }

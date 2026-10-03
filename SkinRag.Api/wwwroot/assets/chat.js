@@ -51,6 +51,46 @@
                 );
             });
             if (selected) $select.val(selected);
+            syncCheckboxDropdown(id);
+        }
+
+        function syncCheckboxDropdown(id) {
+            var $select = $(id),
+                $dropdown = $select.next(".check-dropdown"),
+                isMultiple = $select.prop("multiple"),
+                selected = $select.val() || [],
+                label = $("label[for='" + id.slice(1) + "']").text().trim();
+            if (!Array.isArray(selected)) selected = selected ? [selected] : [];
+            if (!$dropdown.length) {
+                $dropdown = $("<details>").addClass("check-dropdown");
+                $dropdown.append(
+                    $("<summary>").append(
+                        $("<span>").addClass("check-dropdown-label").text(label),
+                        $("<span>").addClass("check-dropdown-value"),
+                    ),
+                    $("<div>").addClass("check-dropdown-options").attr({ role: "group", "aria-label": label }),
+                );
+                $select.after($dropdown).addClass("filter-source").attr("aria-hidden", "true");
+            }
+            var $summary = $dropdown.find(".check-dropdown-value").empty(),
+                optionLabels = selected.map(function (value) {
+                    return $select.find("option").filter(function () { return this.value === value; }).text();
+                }).filter(Boolean);
+            $summary.text(optionLabels.length ? optionLabels.join("، ") : "انتخاب کنید");
+            var $options = $dropdown.find(".check-dropdown-options").empty();
+            $select.find("option").each(function () {
+                var value = this.value,
+                    optionText = $(this).text(),
+                    $input = $("<input>").attr({ type: "checkbox", value: value }).prop("checked", selected.includes(value));
+                if (isMultiple && !value) return;
+                $options.append($("<label>").addClass("check-dropdown-option").append($input, $("<span>").text(optionText)));
+            });
+        }
+
+        function syncAllCheckboxDropdowns() {
+            $(".filters-panel select").each(function () {
+                syncCheckboxDropdown("#" + this.id);
+            });
         }
 
         function setDomain(value, preserve) {
@@ -76,6 +116,7 @@
                     preserve,
                 );
             }
+            syncAllCheckboxDropdowns();
             updateSummary();
         }
 
@@ -86,6 +127,7 @@
             $("#fragranceFree").prop("checked", false);
             $(".advanced-filters").prop("open", false);
             setDomain(null, false);
+            syncAllCheckboxDropdowns();
             if (collapsePanel) {
                 $(".filters-panel").removeClass("filters-open");
                 $("#toggleFilters").attr("aria-expanded", "false").text("نمایش فیلترها");
@@ -167,6 +209,7 @@
                         );
                     });
                     $("#excludedIngredients").val(selectedIngredients);
+                    syncCheckboxDropdown("#excludedIngredients");
                     filtersReady = true;
                     setDomain(domain, true);
                     checkStatus();
@@ -463,6 +506,9 @@
                 $question.trigger("focus");
                 return;
             }
+            // Chat and filter search are separate modes. A written message always
+            // starts a clean chat request without catalog preferences.
+            if (question) resetPreferences(false);
             try {
                 request = readRequest(question);
                 if (!question) {
@@ -636,10 +682,37 @@
             $(".filters-panel").toggleClass("filters-open", expanded);
         });
         $(".filters-panel input, .filters-panel select").on("change input", updateSummary);
+        $(document).on("change", ".check-dropdown input[type=checkbox]", function () {
+            var $dropdown = $(this).closest(".check-dropdown"),
+                $select = $dropdown.prev("select"),
+                isMultiple = $select.prop("multiple"),
+                value = this.value;
+            if (isMultiple) {
+                var selected = $select.val() || [];
+                if (this.checked && !selected.includes(value)) selected.push(value);
+                if (!this.checked) selected = selected.filter(function (item) { return item !== value; });
+                $select.val(selected);
+            } else {
+                $select.val(this.checked ? value : "");
+                $dropdown.find("input[type=checkbox]").not(this).prop("checked", false);
+            }
+            syncCheckboxDropdown("#" + $select.attr("id"));
+            if (!isMultiple) $dropdown.prop("open", false);
+            $select.trigger("change");
+        });
+        $(document).on("click", function (event) {
+            if (!$(event.target).closest(".check-dropdown").length)
+                $(".check-dropdown[open]").prop("open", false);
+        });
+        $(document).on("keydown", function (event) {
+            if (event.key === "Escape") $(".check-dropdown[open]").prop("open", false);
+        });
         $("#resetFilters").on("click", function () {
             resetPreferences(false);
         });
         $("#applyFilters").on("click", function () {
+            // Filter search must never include draft chat text.
+            $question.val("").trigger("input");
             $("#chatForm").trigger("submit");
         });
         $(".example-question").on("click", function () {

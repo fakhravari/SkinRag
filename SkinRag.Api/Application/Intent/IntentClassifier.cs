@@ -1,24 +1,21 @@
 using System.Text.RegularExpressions;
 using SkinRag.Api.Application.Abstractions;
-using SkinRag.Api.Application.Parsing;
 using SkinRag.Api.Application.Common.Text;
+using SkinRag.Api.Application.Parsing;
 using SkinRag.Api.Application.Prompts;
 
 namespace SkinRag.Api.Application.Intent;
 
-public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguration configuration, ILogger<IntentClassifier> logger) : IIntentClassifier
+public sealed partial class IntentClassifier(
+    IOllamaClient ollama,
+    IConfiguration configuration,
+    ILogger<IntentClassifier> logger) : IIntentClassifier
 {
-    [GeneratedRegex(@"^قیمت(?: (?:محصول|شناسه))? [0-9]+ (?:چنده|چقدره|چقدر است)$")]
-    private static partial Regex PriceReference();
-    [GeneratedRegex(@"^(?:ترکیبات|مواد تشکیل دهنده)(?: محصول)? [0-9]+ (?:چیه|چیست|رو بگو)$")]
-    private static partial Regex DetailsReference();
-    [GeneratedRegex(@"^(?:محصول )?[0-9]+ (?:موجوده|موجود است|موجود هست)$")]
-    private static partial Regex AvailabilityReference();
-
     // Match product domains instead of maintaining a growing list of individual SKUs or categories.
     private static readonly string[] ProductDomainTerms =
     [
-        "پوست", "مو", "صورت", "لب", "چشم", "مژه", "ناخن", "دست", "بدن", "آرایش", "آرایشی", "زیبایی", "بهداشتی", "مراقبتی",
+        "پوست", "مو", "صورت", "لب", "چشم", "مژه", "ناخن", "دست", "بدن", "آرایش", "آرایشی", "زیبایی", "بهداشتی",
+        "مراقبتی",
         "شامپو", "آبرسان", "ضدآفتاب", "ضد آفتاب", "مرطوب کننده", "شوینده", "بالم", "میسلار", "لوسیون",
         "برنزر", "برانزر", "برق لب", "لیپ گلاس", "بی بی کرم", "پرایمر", "پنکیک", "مداد ابرو", "هایلایتر", "فاندیشن",
         "کف سر", "پوست سر", "خوشبو کننده", "خوشبوکننده", "عطر", "سلولزی", "دستمال", "گوش پاک کن",
@@ -118,7 +115,7 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
         "\u062a\u06cc\u0646\u062a\u0020\u0622\u0628\u0631\u0633\u0627\u0646",
         "\u0628\u0631\u0633\u0020\u0622\u0631\u0627\u06cc\u0634\u06cc",
         "\u0633\u0627\u06cc\u0647\u0020\u0686\u0634\u0645",
-        "\u0642\u0644\u0645\u0020\u0633\u0641\u06cc\u062f\u06a9\u0646\u0646\u062f\u0647\u0020\u062f\u0646\u062f\u0627\u0646",
+        "\u0642\u0644\u0645\u0020\u0633\u0641\u06cc\u062f\u06a9\u0646\u0646\u062f\u0647\u0020\u062f\u0646\u062f\u0627\u0646"
     ];
 
     private static readonly string[] ProductRequestTerms =
@@ -140,41 +137,45 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
         "قیمتش", "ترکیباتش", "موجوده", "ارزان تر", "ارزون تر"
     ];
 
-    [GeneratedRegex(@"^(?:(?:یه|یک|یکی|گزینه|محصول) )?(?:ارزان|ارزون) ?تر(?:ش)?(?: (?:چی|چیه|هم|داری|هست|موجوده|میخوام|میخواهم))*$")]
-    private static partial Regex BudgetFollowUp();
-
-    public Task<IntentDecision> ClassifyAsync(string message, IReadOnlyList<string> previousQuestions, CancellationToken ct) =>
-        ClassifyAsync(message, new IntentContext(previousQuestions, previousQuestions, previousQuestions.Count > 0), ct);
+    public Task<IntentDecision> ClassifyAsync(string message, IReadOnlyList<string> previousQuestions,
+        CancellationToken ct)
+    {
+        return ClassifyAsync(message,
+            new IntentContext(previousQuestions, previousQuestions, previousQuestions.Count > 0), ct);
+    }
 
     public async Task<IntentDecision> ClassifyAsync(string message, IntentContext context, CancellationToken ct)
     {
         if (ConversationReplies.GetTopic(message) is { } topic)
         {
-            return new(topic == ConversationTopic.Greeting ? ConsultationIntent.Greeting : ConsultationIntent.SmallTalk, 1, "rules")
+            return new IntentDecision(
+                topic == ConversationTopic.Greeting ? ConsultationIntent.Greeting : ConsultationIntent.SmallTalk, 1,
+                "rules")
             {
                 ConversationTopic = topic
             };
         }
+
         // Obvious unrelated requests stop before any model, SQL or embeddings.
         var normalized = PersianText.Normalize(message);
         if (Has(normalized, "جوک", "لطیفه", "joke", "سیاست", "فوتبال", "برنامه نویسی"))
         {
-            return new(ConsultationIntent.OffTopic, 1, "rules");
+            return new IntentDecision(ConsultationIntent.OffTopic, 1, "rules");
         }
 
         if (PriceReference().IsMatch(normalized))
         {
-            return new(ConsultationIntent.PriceInquiry, 1, "product-reference-rule");
+            return new IntentDecision(ConsultationIntent.PriceInquiry, 1, "product-reference-rule");
         }
 
         if (DetailsReference().IsMatch(normalized))
         {
-            return new(ConsultationIntent.ProductDetails, 1, "product-reference-rule");
+            return new IntentDecision(ConsultationIntent.ProductDetails, 1, "product-reference-rule");
         }
 
         if (AvailabilityReference().IsMatch(normalized))
         {
-            return new(ConsultationIntent.AvailabilityInquiry, 1, "product-reference-rule");
+            return new IntentDecision(ConsultationIntent.AvailabilityInquiry, 1, "product-reference-rule");
         }
 
         var shortIntent = normalized switch
@@ -188,25 +189,30 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
         {
             shortIntent = ConsultationIntent.FollowUp;
         }
+
         // Explicit product requests in a known care domain bypass small-model confidence calibration.
         // Factual price, stock, and ingredient questions continue through normal intent routing.
         if (HasProductDomain(normalized)
             && Has(normalized, ProductRequestTerms)
             && !Has(normalized, "قیمت", "چند", "هزینه", "موجود", "ترکیبات", "مواد تشکیل دهنده", "روش مصرف"))
         {
-            return new(ConsultationIntent.ProductSearch, 1, "persian-product-request-rule");
+            return new IntentDecision(ConsultationIntent.ProductSearch, 1, "persian-product-request-rule");
         }
+
         // A standalone concern (for example, "موهام زود چرب میشه") is a consultation request,
         // even when the customer does not explicitly say "recommend a product".
         if (HasProductDomain(normalized) && normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .Any(word => CustomerConcernRoots.Any(root => word.StartsWith(root, StringComparison.Ordinal)))
-            && (!context.HasProductContext || !Has(normalized, ProductFollowUpReferences)))
+                                             .Any(word => CustomerConcernRoots.Any(root =>
+                                                 word.StartsWith(root, StringComparison.Ordinal)))
+                                         && (!context.HasProductContext || !Has(normalized, ProductFollowUpReferences)))
         {
-            return new(ConsultationIntent.SkinConsultation, 1, "customer-concern-rule");
+            return new IntentDecision(ConsultationIntent.SkinConsultation, 1, "customer-concern-rule");
         }
+
         if (shortIntent.HasValue)
         {
-            return new(context.HasProductContext ? shortIntent.Value : ConsultationIntent.Unclear, 1, "context-rule")
+            return new IntentDecision(context.HasProductContext ? shortIntent.Value : ConsultationIntent.Unclear, 1,
+                "context-rule")
             {
                 RequiresContext = true,
                 Clarification = context.HasProductContext ? null : ClarificationKind.ProductReference
@@ -218,14 +224,16 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
         {
             if (budget.NeedsClarification)
             {
-                return new(ConsultationIntent.Unclear, 1, "budget-rule")
+                return new IntentDecision(ConsultationIntent.Unclear, 1, "budget-rule")
                 {
                     Clarification = budget.Status == BudgetStatus.MissingCurrency
-                        ? ClarificationKind.BudgetCurrency : ClarificationKind.BudgetAmount
+                        ? ClarificationKind.BudgetCurrency
+                        : ClarificationKind.BudgetAmount
                 };
             }
 
-            return new(context.HasProductContext ? ConsultationIntent.FollowUp : ConsultationIntent.Unclear, 1, "budget-rule")
+            return new IntentDecision(
+                context.HasProductContext ? ConsultationIntent.FollowUp : ConsultationIntent.Unclear, 1, "budget-rule")
             {
                 RequiresContext = context.HasProductContext,
                 Clarification = context.HasProductContext ? null : ClarificationKind.ProductType
@@ -244,17 +252,19 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
                     hasProductContext = context.HasProductContext
                 },
                 PipelinePrompts.IntentSchema,
-                new(
-                "Intent",
-                configuration.GetValue("Consultation:IntentTimeoutSeconds", 70),
-                configuration.GetValue("Consultation:IntentMaxTokens", 128)),
+                new ModelRequest(
+                    "Intent",
+                    configuration.GetValue("Consultation:IntentTimeoutSeconds", 70),
+                    configuration.GetValue("Consultation:IntentMaxTokens", 128)),
                 ct);
-            if (!TryValidate(output, configuration.GetValue("Consultation:MinimumIntentConfidence", .65), out var decision))
+            if (!TryValidate(output, configuration.GetValue("Consultation:MinimumIntentConfidence", .65),
+                    out var decision))
             {
-                return new(ConsultationIntent.Unclear, 0, "invalid-model-output");
+                return new IntentDecision(ConsultationIntent.Unclear, 0, "invalid-model-output");
             }
 
-            if ((decision.RequiresContext || decision.Intent == ConsultationIntent.FollowUp) && !context.HasProductContext)
+            if ((decision.RequiresContext || decision.Intent == ConsultationIntent.FollowUp) &&
+                !context.HasProductContext)
             {
                 return decision with
                 {
@@ -267,21 +277,36 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
             return decision;
         }
         catch (Exception ex) when (!ct.IsCancellationRequested
-            && ex is (OperationCanceledException or HttpRequestException or InvalidModelOutputException))
+                                   && ex is OperationCanceledException or HttpRequestException
+                                       or InvalidModelOutputException)
         {
-            logger.LogWarning("Intent classifier unavailable ({ErrorType}); using conservative routing", ex.GetType().Name);
+            logger.LogWarning("Intent classifier unavailable ({ErrorType}); using conservative routing",
+                ex.GetType().Name);
             // Unclassified text never falls through to product retrieval.
-            return new(ConsultationIntent.Unclear, 0, "classifier-unavailable");
+            return new IntentDecision(ConsultationIntent.Unclear, 0, "classifier-unavailable");
         }
     }
 
+    [GeneratedRegex(@"^قیمت(?: (?:محصول|شناسه))? [0-9]+ (?:چنده|چقدره|چقدر است)$")]
+    private static partial Regex PriceReference();
+
+    [GeneratedRegex(@"^(?:ترکیبات|مواد تشکیل دهنده)(?: محصول)? [0-9]+ (?:چیه|چیست|رو بگو)$")]
+    private static partial Regex DetailsReference();
+
+    [GeneratedRegex(@"^(?:محصول )?[0-9]+ (?:موجوده|موجود است|موجود هست)$")]
+    private static partial Regex AvailabilityReference();
+
+    [GeneratedRegex(
+        @"^(?:(?:یه|یک|یکی|گزینه|محصول) )?(?:ارزان|ارزون) ?تر(?:ش)?(?: (?:چی|چیه|هم|داری|هست|موجوده|میخوام|میخواهم))*$")]
+    private static partial Regex BudgetFollowUp();
+
     public static bool TryValidate(IntentModelOutput output, double minimum, out IntentDecision decision)
     {
-        decision = new(ConsultationIntent.Unclear, 0, "invalid-model-output");
+        decision = new IntentDecision(ConsultationIntent.Unclear, 0, "invalid-model-output");
         if (output.Intent is null || !IntentCodes.TryParse(output.Intent, out var intent)
-            || !double.IsFinite(output.Confidence)
-            || output.Confidence < 0
-            || output.Confidence > 1)
+                                  || !double.IsFinite(output.Confidence)
+                                  || output.Confidence < 0
+                                  || output.Confidence > 1)
         {
             return false;
         }
@@ -293,7 +318,7 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
         }
 
         var isSocial = intent is ConsultationIntent.Greeting or ConsultationIntent.SmallTalk;
-        if ((intent == ConsultationIntent.SmallTalk && (topic is null or ConversationTopic.Greeting))
+        if ((intent == ConsultationIntent.SmallTalk && topic is null or ConversationTopic.Greeting)
             || (intent == ConsultationIntent.Greeting && topic is not (null or ConversationTopic.Greeting))
             || (!isSocial && topic is not null)
             || (isSocial && output.RequiresContext)
@@ -303,7 +328,7 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
         }
 
         var uncertain = output.Confidence < minimum;
-        decision = new(uncertain ? ConsultationIntent.Unclear : intent, output.Confidence, "model")
+        decision = new IntentDecision(uncertain ? ConsultationIntent.Unclear : intent, output.Confidence, "model")
         {
             ConversationTopic = uncertain ? null : topic,
             Clarification = uncertain ? ClarificationKind.General : clarification,
@@ -330,7 +355,10 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
         return true;
     }
 
-    private static bool Has(string text, params string[] phrases) => phrases.Any(p => (" " + text + " ").Contains(" " + p + " ", StringComparison.Ordinal));
+    private static bool Has(string text, params string[] phrases)
+    {
+        return phrases.Any(p => (" " + text + " ").Contains(" " + p + " ", StringComparison.Ordinal));
+    }
 
     private static bool HasProductDomain(string text)
     {
@@ -345,8 +373,8 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
         }
 
         return text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Any(word =>
-            word.StartsWith("مو", StringComparison.Ordinal) && word.Length <= 7
-            || word.StartsWith("پوست", StringComparison.Ordinal) && word.Length <= 7
-            || word.StartsWith("صورت", StringComparison.Ordinal) && word.Length <= 7);
+            (word.StartsWith("مو", StringComparison.Ordinal) && word.Length <= 7)
+            || (word.StartsWith("پوست", StringComparison.Ordinal) && word.Length <= 7)
+            || (word.StartsWith("صورت", StringComparison.Ordinal) && word.Length <= 7));
     }
 }

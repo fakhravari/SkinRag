@@ -1,6 +1,5 @@
-using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Application.Contracts.Catalog;
-using SkinRag.Api.Application.Contracts.Consultation;
+using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Domain.Catalog;
 
 namespace SkinRag.Api.Application.Retrieval;

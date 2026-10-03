@@ -1,15 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Knowledge;
-using Microsoft.EntityFrameworkCore;
-using SkinRag.Api.Infrastructure.Persistence;
-using SkinRag.Api.Infrastructure.Persistence.Entities;
-using SkinRag.Api.Application.Contracts.Catalog;
-using SkinRag.Api.Application.Contracts.Consultation;
 using SkinRag.Api.Domain.Catalog;
 using SkinRag.Api.Infrastructure.Catalog;
+using SkinRag.Api.Infrastructure.Persistence;
+using SkinRag.Api.Infrastructure.Persistence.Entities;
 
 namespace SkinRag.Api.Infrastructure.Knowledge;
 
@@ -21,11 +19,14 @@ public sealed class KnowledgeIndexService(
 {
     private const string DefaultEmbeddingVersion = "catalog-v4";
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private KnowledgeSnapshot _snapshot = new(Array.Empty<KnowledgeDocument>(), false, null);
     private int _isRebuilding, _processed, _total, _cached;
     private string? _lastError;
+    private KnowledgeSnapshot _snapshot = new(Array.Empty<KnowledgeDocument>(), false, null);
 
-    public KnowledgeSnapshot Snapshot() => Volatile.Read(ref _snapshot);
+    public KnowledgeSnapshot Snapshot()
+    {
+        return Volatile.Read(ref _snapshot);
+    }
 
     public KnowledgeIndexStatus Status()
     {
@@ -53,10 +54,13 @@ public sealed class KnowledgeIndexService(
         try
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-            var products = await CatalogQueryService.Hydrate(db.Products.AsNoTracking().Where(p => p.IsActive).OrderBy(p => p.Id))
+            db.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.TrackAll;
+            var products = await CatalogQueryService
+                .Hydrate(db.Products.AsNoTracking().Where(p => p.IsActive).OrderBy(p => p.Id))
                 .ToListAsync(cancellationToken);
             Volatile.Write(ref _total, products.Count);
-            var cache = await db.ProductEmbeddings.Where(e => e.Model == ollama.EmbeddingModel).ToDictionaryAsync(e => e.ProductId, cancellationToken);
+            var cache = await db.ProductEmbeddings.Where(e => e.Model == ollama.EmbeddingModel)
+                .ToDictionaryAsync(e => e.ProductId, cancellationToken);
             var prefix = configuration["Rag:DocumentPrefix"] ?? "search_document: ";
             var version = configuration["Rag:EmbeddingVersion"] ?? DefaultEmbeddingVersion;
             var next = new Dictionary<int, KnowledgeDocument>();
@@ -64,7 +68,8 @@ public sealed class KnowledgeIndexService(
             foreach (var p in products)
             {
                 var content = ToKnowledgeText(p);
-                var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(version + "|" + prefix + content)));
+                var hash = Convert.ToHexString(
+                    SHA256.HashData(Encoding.UTF8.GetBytes(version + "|" + prefix + content)));
                 if (!force && cache.TryGetValue(p.Id, out var stored) && stored.ContentHash == hash
                     && TryReadVector(stored, out var vector))
                 {
@@ -81,7 +86,8 @@ public sealed class KnowledgeIndexService(
             var batchSize = Math.Clamp(configuration.GetValue("Rag:EmbeddingBatchSize", 16), 1, 64);
             foreach (var batch in pending.Chunk(batchSize))
             {
-                var embeddings = await ollama.EmbedBatchAsync(batch.Select(x => prefix + x.Content).ToArray(), cancellationToken);
+                var embeddings = await ollama.EmbedBatchAsync(batch.Select(x => prefix + x.Content).ToArray(),
+                    cancellationToken);
                 for (var i = 0; i < batch.Length; i++)
                 {
                     var item = batch[i];
@@ -110,18 +116,19 @@ public sealed class KnowledgeIndexService(
 
             if (next.Values.Select(x => x.Embedding.Length).Distinct().Count() > 1)
             {
-                throw new InvalidOperationException("Embedding dimensions changed; force a rebuild with a stable embedding model.");
+                throw new InvalidOperationException(
+                    "Embedding dimensions changed; force a rebuild with a stable embedding model.");
             }
 
-            Volatile.Write(
-                ref _snapshot,
+            Volatile.Write(ref _snapshot,
                 new KnowledgeSnapshot(next.Values.OrderBy(x => x.ProductId).ToArray(), true, DateTime.UtcNow));
             Volatile.Write(ref _lastError, null);
             logger.LogInformation("Index ready: {Count} products, {Cached} from SQL cache", next.Count, _cached);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
-            Volatile.Write(ref _lastError, "بازسازی دانش ناموفق بود؛ اتصال دیتابیس و Ollama و گزارش سرور را بررسی کنید.");
+            Volatile.Write(ref _lastError,
+                "بازسازی دانش ناموفق بود؛ اتصال دیتابیس و Ollama و گزارش سرور را بررسی کنید.");
             throw;
         }
         finally
@@ -153,21 +160,24 @@ public sealed class KnowledgeIndexService(
         }
     }
 
-    public static string ToKnowledgeText(Product p) => $"""
-        Product: {p.Name}
-        Domain: {p.CategoryDetails?.Domain}; Category: {p.CategoryDetails?.Name ?? p.Category}
-        Brand: {p.BrandDetails?.Name ?? p.Brand}
-        Skin types: {p.SkinTypes}; Hair types: {p.HairTypes}
-        Profiles: {string.Join(", ", p.ProductProfiles.OrderBy(x => x.ProfileId).Select(x => x.Profile.Name))}
-        Concerns: {p.Concerns}
-        Search terms: {p.SearchKeywords} {string.Join(" ", p.ProductConcerns.OrderBy(x => x.ConcernId).Select(x => x.Concern.SearchTerms))}
-        Ingredients: {p.Ingredients}
-        Fragrance free declared: {(p.FragranceFreeKnown ? p.FragranceFree.ToString() : "unknown")}
-        Description: {p.Description}
-        Warnings: {p.Warnings}
-        Usage: {p.UsageInstructions}
-        Variants: {string.Join(
-        "; ",
-        p.Variants.Where(x => x.IsActive).OrderBy(x => x.Id).Select(x => $"{x.SizeValue} {x.SizeUnit} {x.Shade} {x.Finish}"))}
-        """;
+    public static string ToKnowledgeText(Product p)
+    {
+        return $"""
+                Product: {p.Name}
+                Domain: {p.CategoryDetails?.Domain}; Category: {p.CategoryDetails?.Name ?? p.Category}
+                Brand: {p.BrandDetails?.Name ?? p.Brand}
+                Skin types: {p.SkinTypes}; Hair types: {p.HairTypes}
+                Profiles: {string.Join(", ", p.ProductProfiles.OrderBy(x => x.ProfileId).Select(x => x.Profile.Name))}
+                Concerns: {p.Concerns}
+                Search terms: {p.SearchKeywords} {string.Join(" ", p.ProductConcerns.OrderBy(x => x.ConcernId).Select(x => x.Concern.SearchTerms))}
+                Ingredients: {p.Ingredients}
+                Fragrance free declared: {(p.FragranceFreeKnown ? p.FragranceFree.ToString() : "unknown")}
+                Description: {p.Description}
+                Warnings: {p.Warnings}
+                Usage: {p.UsageInstructions}
+                Variants: {string.Join(
+                    "; ",
+                    p.Variants.Where(x => x.IsActive).OrderBy(x => x.Id).Select(x => $"{x.SizeValue} {x.SizeUnit} {x.Shade} {x.Finish}"))}
+                """;
+    }
 }

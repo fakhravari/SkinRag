@@ -1,7 +1,5 @@
-using SkinRag.Api.Application.Retrieval;
 using SkinRag.Api.Application.Contracts.Catalog;
-using SkinRag.Api.Application.Contracts.Consultation;
-using SkinRag.Api.Domain.Catalog;
+using SkinRag.Api.Application.Retrieval;
 
 namespace SkinRag.Api.Application.Abstractions;
 

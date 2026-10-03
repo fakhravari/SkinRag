@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using SkinRag.Api.Infrastructure.Persistence;
 using SkinRag.Api.Application.Abstractions;
+using SkinRag.Api.Infrastructure.Persistence;
 
 namespace SkinRag.Api.Hosting;
 

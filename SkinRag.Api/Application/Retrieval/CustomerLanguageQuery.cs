@@ -3,15 +3,16 @@ using SkinRag.Api.Application.Common.Text;
 namespace SkinRag.Api.Application.Retrieval;
 
 /// <summary>
-/// Adds a small, reviewed set of catalog terms for colloquial customer wording.
-/// This expands retrieval text only; it never creates product filters or health claims.
+///     Adds a small, reviewed set of catalog terms for colloquial customer wording.
+///     This expands retrieval text only; it never creates product filters or health claims.
 /// </summary>
 public static class CustomerLanguageQuery
 {
     private static readonly (string[] Phrases, string Terms)[] Mappings =
     [
         // Profiles and concerns: normalize conversational phrasing to terms already indexed from products.
-        (["چربی کف سر", "کف سرم چرب", "کف سر چرب", "موهای چرب", "چرب بودن مو", "موهام چربه", "موهام زود چرب میشه", "موهام زود چرب می شه", "موهام زود چرب می شود"], "موهای چرب چربی پوست سر scalp oily"),
+        (["چربی کف سر", "کف سرم چرب", "کف سر چرب", "موهای چرب", "چرب بودن مو", "موهام چربه", "موهام زود چرب میشه", "موهام زود چرب می شه", "موهام زود چرب می شود"],
+            "موهای چرب چربی پوست سر scalp oily"),
         (["موهام خشکه", "موهای خشک", "خشکی مو", "موهام خشک شده"], "موهای خشک آسیب دیده"),
         (["موهام وزه", "موهای وز", "وز مو", "موهام پف میکنه", "موهام پف می کنه"], "وز و خشکی ساقه مو frizz"),
         (["ریزش مو", "موهام میریزه", "موهام می ریزه", "موهام کم پشت شده"], "ریزش و کم پشتی مو"),
@@ -20,7 +21,8 @@ public static class CustomerLanguageQuery
         (["خارش کف سر", "کف سرم خارش", "خارش پوست سر"], "خارش پوست سر"),
         (["پوستم چربه", "پوست صورتم چرب", "صورتم چربه", "صورتم برق میفته", "چربی صورتم"], "پوست چرب صورت چربی پوست"),
         (["خشکی پوست", "پوستم خشکه", "پوست صورتم خشکه", "صورتم کشیده میشه"], "پوست خشک صورت خشکی پوست"),
-        (["جوش های صورتم", "صورتم جوش میزنه", "جوش میزنم", "جوش صورتم", "ضدآفتاب باعث جوش میشه", "ضد آفتاب باعث جوش میشه", "با ضدآفتاب جوش میزنم", "با ضد آفتاب جوش میزنم"], "جوش صورت ضدآفتاب"),
+        (["جوش های صورتم", "صورتم جوش میزنه", "جوش میزنم", "جوش صورتم", "ضدآفتاب باعث جوش میشه", "ضد آفتاب باعث جوش میشه", "با ضدآفتاب جوش میزنم", "با ضد آفتاب جوش میزنم"],
+            "جوش صورت ضدآفتاب"),
         (["جوش سرسیاه", "دونه سرسیاه", "دونه های سر سیاه", "جوشای سرسیاه"], "جوش سرسیاه منافذ"),
         (["منافذ باز", "منافذ پوستم", "سوراخ های پوستم"], "منافذ باز پوست"),
         (["لک صورتم", "لک پوستی", "لک روی گونه", "لکه های صورتم"], "لک صورت ظاهر ناهمگون پوست"),
@@ -36,10 +38,12 @@ public static class CustomerLanguageQuery
         (["موهام فره", "موهای فر", "موهای مجعد", "موهام مجعده"], "موی فر و مجعد"),
         (["موهام نازکه", "موهای نازک", "تار موهام نازکه"], "موی نازک حجم کم مو"),
         (["موهام معمولیه", "موی معمولی", "موهای معمولی"], "موی معمولی"),
-        (["موهای آسیب دیده", "موهام آسیب دیده", "موهام شکننده است", "موهام شکننده ست"], "موهای آسیب دیده خشکی و مراقبت مو"),
+        (["موهای آسیب دیده", "موهام آسیب دیده", "موهام شکننده است", "موهام شکننده ست"],
+            "موهای آسیب دیده خشکی و مراقبت مو"),
         (["موهام براق باشه", "درخشندگی مو", "موهای کدر", "موهام کدره"], "درخشندگی مو موی کدر"),
         (["لبم خشک میشه", "ترک لب", "خشکی لب"], "خشکی لب بالم لب"),
-        (["پاک کردن آرایش", "آرایشمو پاک کنم", "قبل خواب آرایشم رو پاک کنم"], "پاک کردن آرایش میسلار واتر بالم پاک کننده"),
+        (["پاک کردن آرایش", "آرایشمو پاک کنم", "قبل خواب آرایشم رو پاک کنم"],
+            "پاک کردن آرایش میسلار واتر بالم پاک کننده"),
         (["پوستم رو بشورم", "شوینده صورت میخوام", "صورتمو تمیز کنم"], "پاک سازی پوست شوینده صورت"),
         (["آبرسان میخوام", "پوستم کم آب شده", "پوستم دهیدراته شده"], "آبرسانی رطوبت پوست"),
         (["کرم آبرسان", "کرم مرطوب کننده", "کرم مرطوب‌کننده", "برای خشکی صورتم کرم میخوام"], "مرطوب کننده صورت"),
@@ -68,7 +72,8 @@ public static class CustomerLanguageQuery
         (["شامپو هر روز", "شامپو روزانه", "شامپو برای استفاده روزانه"], "شامپو روزانه"),
         (["شامپو برای موهای چرب", "شامپو موی چرب", "شامپو موهای چرب"], "شامپو موی چرب موهای چرب"),
         (["شامپو برای موهای خشک", "شامپو موی خشک", "شامپو موهای خشک"], "شامپو موی خشک موهای خشک"),
-        (["موهام رنگ شده", "موهای رنگ شده", "شامپو موی رنگ شده", "بعد از رنگ مو"], "شامپو موی رنگ شده مراقبت موی رنگ شده"),
+        (["موهام رنگ شده", "موهای رنگ شده", "شامپو موی رنگ شده", "بعد از رنگ مو"],
+            "شامپو موی رنگ شده مراقبت موی رنگ شده"),
         (["موهام فره", "موهای فر", "شامپو موی فر"], "شامپو موی فر حالت دهی موی فر"),
         (["کرم مو بدون آبکشی", "کرم مو بعد حمام", "کرم مو که نشورمش"], "کرم مو بدون آبکشی leave in"),
         (["کرم موی فر", "کرم برای موهای فر", "حالت دادن موی فر"], "کرم موی فر"),
@@ -115,15 +120,17 @@ public static class CustomerLanguageQuery
         var query = PersianText.Normalize(catalogQuery);
         var additions = MatchingTerms(customerMessage)
             .Where(term => string.IsNullOrWhiteSpace(query)
-                || !query.Contains(PersianText.Normalize(term), StringComparison.Ordinal));
-        return string.Join(' ', new[] { catalogQuery, string.Join(' ', additions) }.Where(x => !string.IsNullOrWhiteSpace(x))).Trim();
+                           || !query.Contains(PersianText.Normalize(term), StringComparison.Ordinal));
+        return string.Join(' ',
+            new[] { catalogQuery, string.Join(' ', additions) }.Where(x => !string.IsNullOrWhiteSpace(x))).Trim();
     }
 
     private static IEnumerable<string> MatchingTerms(string customerMessage)
     {
         var text = PersianText.Normalize(customerMessage);
         return Mappings
-            .Where(mapping => mapping.Phrases.Any(phrase => text.Contains(PersianText.Normalize(phrase), StringComparison.Ordinal)))
+            .Where(mapping =>
+                mapping.Phrases.Any(phrase => text.Contains(PersianText.Normalize(phrase), StringComparison.Ordinal)))
             .Select(mapping => mapping.Terms)
             .Distinct(StringComparer.Ordinal);
     }

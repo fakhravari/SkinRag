@@ -2,8 +2,6 @@ using System.Diagnostics;
 using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Common.Text;
 using SkinRag.Api.Application.Contracts.Catalog;
-using SkinRag.Api.Application.Contracts.Consultation;
-using SkinRag.Api.Domain.Catalog;
 
 namespace SkinRag.Api.Application.Retrieval;
 
@@ -21,7 +19,7 @@ public sealed class ProductRetriever(
         var sqlFilterMs = sqlTimer.Elapsed.TotalMilliseconds;
         if (eligible.Length == 0)
         {
-            return new([], 0, index.Snapshot().UpdatedAtUtc, "sql-filters", sqlFilterMs);
+            return new RetrievalResult([], 0, index.Snapshot().UpdatedAtUtc, "sql-filters", sqlFilterMs);
         }
 
         if (plan.ProductIds.Length > 0)
@@ -29,9 +27,9 @@ public sealed class ProductRetriever(
             var directLoadTimer = Stopwatch.StartNew();
             var direct = await repository.LoadAsync(eligible, plan, ct);
             directLoadTimer.Stop();
-            return new(
+            return new RetrievalResult(
                 direct.OrderBy(p => Array.IndexOf(plan.ProductIds, p.Id)).Select(p => new ProductMatch(p, 1, 1))
-                .ToArray(),
+                    .ToArray(),
                 eligible.Length,
                 null,
                 "sql-product-reference",
@@ -49,7 +47,7 @@ public sealed class ProductRetriever(
         var candidates = snapshot.Documents.Where(d => eligibleSet.Contains(d.ProductId)).ToArray();
         if (candidates.Length == 0)
         {
-            return new([], eligible.Length, snapshot.UpdatedAtUtc, "hybrid-vector-lexical");
+            return new RetrievalResult([], eligible.Length, snapshot.UpdatedAtUtc, "hybrid-vector-lexical");
         }
 
         var embeddingTimer = Stopwatch.StartNew();
@@ -65,16 +63,18 @@ public sealed class ProductRetriever(
         var minimum = configuration.GetValue("Rag:MinimumSimilarity", .20);
         var topK = Math.Clamp(configuration.GetValue("Rag:TopK", 5), 1, 10);
         var ranked = candidates.Select(d => new
-        {
-            Document = d,
-            Similarity = Cosine(vector, d.Embedding, norm, d.VectorNorm)
-        })
+            {
+                Document = d,
+                Similarity = Cosine(vector, d.Embedding, norm, d.VectorNorm)
+            })
             .Where(x => x.Similarity >= minimum)
             .Select(x => new
             {
                 Id = x.Document.ProductId,
                 x.Similarity,
-                Score = .8 * x.Similarity + .2 * (tokens.Count == 0 ? 0 : (double)tokens.Count(x.Document.Tokens.Contains) / tokens.Count)
+                Score = .8 * x.Similarity + .2 * (tokens.Count == 0
+                    ? 0
+                    : (double)tokens.Count(x.Document.Tokens.Contains) / tokens.Count)
             })
             .OrderByDescending(x => x.Score)
             .ThenBy(x => x.Id)
@@ -84,9 +84,10 @@ public sealed class ProductRetriever(
         var loadTimer = Stopwatch.StartNew();
         var live = (await repository.LoadAsync(ranked.Select(x => x.Id), plan, ct)).ToDictionary(x => x.Id);
         loadTimer.Stop();
-        IEnumerable<ProductMatch> matches = ranked.Where(x => live.ContainsKey(x.Id)).Select(x => new ProductMatch(live[x.Id], Math.Round(x.Similarity, 4), Math.Round(x.Score, 4)));
+        var matches = ranked.Where(x => live.ContainsKey(x.Id)).Select(x =>
+            new ProductMatch(live[x.Id], Math.Round(x.Similarity, 4), Math.Round(x.Score, 4)));
         matches = plan.PreferBudget ? matches.OrderBy(x => x.Product.Price).ThenByDescending(x => x.Score) : matches;
-        return new(
+        return new RetrievalResult(
             matches.Take(topK).ToArray(),
             eligible.Length,
             snapshot.UpdatedAtUtc,

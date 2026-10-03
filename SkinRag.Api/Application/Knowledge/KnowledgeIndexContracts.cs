@@ -1,6 +1,9 @@
 namespace SkinRag.Api.Application.Knowledge;
 
-public sealed record KnowledgeSnapshot(IReadOnlyList<KnowledgeDocument> Documents, bool IsReady, DateTime? UpdatedAtUtc);
+public sealed record KnowledgeSnapshot(
+    IReadOnlyList<KnowledgeDocument> Documents,
+    bool IsReady,
+    DateTime? UpdatedAtUtc);
 
 public sealed record KnowledgeIndexStatus(
     int IndexedProducts,

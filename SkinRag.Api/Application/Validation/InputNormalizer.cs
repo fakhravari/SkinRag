@@ -8,6 +8,7 @@ public static partial class InputNormalizer
 {
     [GeneratedRegex(@"\s+")]
     private static partial Regex Spaces();
+
     [GeneratedRegex(@"([!?؟])\1+")]
     private static partial Regex RepeatedPunctuation();
 

@@ -1,9 +1,7 @@
 using Microsoft.Extensions.Caching.Memory;
+using SkinRag.Api.Application.Contracts.Catalog;
 using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Application.Retrieval;
-using SkinRag.Api.Application.Contracts.Catalog;
-using SkinRag.Api.Application.Contracts.Consultation;
-using SkinRag.Api.Domain.Catalog;
 
 namespace SkinRag.Api.Application.Consultation;
 
@@ -21,7 +19,17 @@ public sealed class ConversationStore : IDisposable
 {
     private readonly MemoryCache _cache = new(new MemoryCacheOptions { SizeLimit = 500 });
 
-    public ConversationState Read(Guid? id) => id.HasValue && _cache.TryGetValue(id.Value, out ConversationState? state) && state is not null ? state : new(Guid.NewGuid(), [], [], DateTime.UtcNow);
+    public void Dispose()
+    {
+        _cache.Dispose();
+    }
+
+    public ConversationState Read(Guid? id)
+    {
+        return id.HasValue && _cache.TryGetValue(id.Value, out ConversationState? state) && state is not null
+            ? state
+            : new ConversationState(Guid.NewGuid(), [], [], DateTime.UtcNow);
+    }
 
     public void Save(ConversationState previous, string question, IEnumerable<int> ids, SearchPlan? plan = null)
     {
@@ -33,8 +41,16 @@ public sealed class ConversationStore : IDisposable
             PendingMinimumBudgetRials = null,
             ProductIds = ids.Distinct().Take(10).ToArray(),
             UpdatedAtUtc = DateTime.UtcNow,
-            SearchQuery = plan?.Intent is ConsultationIntent.ProductSearch or ConsultationIntent.SkinConsultation or ConsultationIntent.RoutineRecommendation or ConsultationIntent.FollowUp ? plan.Query : previous.SearchQuery,
-            SearchFilters = plan?.Intent is ConsultationIntent.ProductSearch or ConsultationIntent.SkinConsultation or ConsultationIntent.RoutineRecommendation or ConsultationIntent.FollowUp ? QueryBuilder.CopyFilters(plan.Filters) : previous.SearchFilters
+            SearchQuery =
+            plan?.Intent is ConsultationIntent.ProductSearch or ConsultationIntent.SkinConsultation
+                or ConsultationIntent.RoutineRecommendation or ConsultationIntent.FollowUp
+                ? plan.Query
+                : previous.SearchQuery,
+            SearchFilters =
+            plan?.Intent is ConsultationIntent.ProductSearch or ConsultationIntent.SkinConsultation
+                or ConsultationIntent.RoutineRecommendation or ConsultationIntent.FollowUp
+                ? QueryBuilder.CopyFilters(plan.Filters)
+                : previous.SearchFilters
         };
         Store(next);
     }
@@ -48,7 +64,8 @@ public sealed class ConversationStore : IDisposable
         });
     }
 
-    public void SaveBudget(ConversationState previous, string message, decimal maximumPriceRials, decimal? minimumPriceRials = null)
+    public void SaveBudget(ConversationState previous, string message, decimal maximumPriceRials,
+        decimal? minimumPriceRials = null)
     {
         Store(previous with
         {
@@ -61,13 +78,14 @@ public sealed class ConversationStore : IDisposable
 
     private void Store(ConversationState next)
     {
-        _cache.Set(next.Id, next, new MemoryCacheEntryOptions { Size = 1, SlidingExpiration = TimeSpan.FromMinutes(30) });
+        _cache.Set(next.Id, next,
+            new MemoryCacheEntryOptions { Size = 1, SlidingExpiration = TimeSpan.FromMinutes(30) });
     }
 
     public static bool IsRepeated(ConversationState state, string question)
     {
         var recent = state.RecentUserMessages.Length > 0 ? state.RecentUserMessages : state.UserQuestions;
-        return DateTime.UtcNow - state.UpdatedAtUtc < TimeSpan.FromSeconds(30) && recent.Length >= 3 && recent.TakeLast(3).All(x => x == question);
+        return DateTime.UtcNow - state.UpdatedAtUtc < TimeSpan.FromSeconds(30) && recent.Length >= 3 &&
+               recent.TakeLast(3).All(x => x == question);
     }
-    public void Dispose() => _cache.Dispose();
 }

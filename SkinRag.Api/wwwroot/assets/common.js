@@ -25,10 +25,8 @@
             return isNaN(date.getTime())
                 ? "—"
                 : date.toLocaleString("fa-IR", {
-                      dateStyle: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      second: "2-digit",
+                      dateStyle: "medium",
+                      timeStyle: "short",
                   });
         },
         time: function () {
