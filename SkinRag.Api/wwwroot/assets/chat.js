@@ -65,8 +65,7 @@
             if (!$dropdown.length) {
                 $dropdown = $("<details>").addClass("check-dropdown");
                 $dropdown.append(
-                    $("<summary>").append(
-                        $("<span>").addClass("check-dropdown-label").text(label),
+                    $("<summary>").attr("aria-label", label).append(
                         $("<span>").addClass("check-dropdown-value"),
                     ),
                     $("<div>").addClass("check-dropdown-options").attr({ role: "group", "aria-label": label }),

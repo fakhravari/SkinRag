@@ -2204,3 +2204,47 @@ body {
         transition: none;
     }
 }
+
+/* Keep checkbox dropdowns compact despite the larger sizing of regular form inputs. */
+.filters-panel .check-dropdown-options {
+    max-height: 220px;
+    gap: 1px;
+    padding: 4px;
+}
+.filters-panel .field > label {
+    font-size: 15px;
+}
+.filters-panel .check-dropdown summary {
+    min-height: 50px;
+}
+.filters-panel .check-dropdown-value {
+    font-size: 15px;
+}
+.filters-panel .check-dropdown-option {
+    min-height: 29px;
+    gap: 7px;
+    padding: 3px 6px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.35;
+}
+.filters-panel .check-dropdown-option input[type="checkbox"] {
+    appearance: none;
+    display: grid;
+    place-content: center;
+    width: 15px;
+    height: 15px;
+    min-width: 15px;
+    max-width: 15px;
+    min-height: 15px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid #c9c2ce;
+    border-radius: 4px;
+    background: #fff;
+    flex: 0 0 15px;
+}
+.filters-panel .check-dropdown-option input[type="checkbox"]:checked {
+    border-color: var(--purple);
+    background: var(--purple);
+}

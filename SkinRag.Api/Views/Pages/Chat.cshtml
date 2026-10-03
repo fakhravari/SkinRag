@@ -12,10 +12,6 @@
         </h1>
         <p>محصول‌های پوست، مو و زیبایی را متناسب با ترجیحات خود پیدا کنید.</p>
     </div>
-    <span id="connectionBadge" class="pill warn" role="status">
-        <span class="dot"></span>
-        <span>در حال اتصال</span>
-    </span>
 </div>
 <div id="chatConnection" class="notice info chat-connection" role="status" hidden>
     <span id="connectionMessage"></span>
@@ -40,10 +36,6 @@
         </button>
     </div>
     <div id="filterContent" class="filters-content">
-        <p class="muted small">
-            بدون انتخاب فیلتر هم می‌توانید پیام بفرستید. فقط گزینه‌های مورد نیازتان را
-            انتخاب کنید.
-        </p>
         <div class="filters-basic">
             <div class="field">
                 <label for="domain">
@@ -63,6 +55,16 @@
                 </label>
                 <select id="category" multiple>
                     <option value="">همه محصولات</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="brand">
+                    <svg class="icon" aria-hidden="true">
+                        <use href="/assets/icons.svg#tag"/>
+                    </svg>برند
+                </label>
+                <select id="brand" multiple>
+                    <option value="">همه برندها</option>
                 </select>
             </div>
             <div id="skinField" class="field">
@@ -86,35 +88,6 @@
                 </select>
             </div>
             <div class="field">
-                <label for="maxPrice">
-                    <svg class="icon" aria-hidden="true">
-                        <use href="/assets/icons.svg#tag"/>
-                    </svg>
-                    حداکثر بودجه
-                    <span class="muted">(ریال)</span>
-                </label>
-                <input
-                    id="maxPrice"
-                    type="number"
-                    min="0"
-                    max="1000000000"
-                    step="10000"
-                    placeholder="مثلاً ۱۵۰۰۰۰۰"
-                    inputmode="numeric"/>
-                <span class="field-hint">قیمت‌ها به ریال هستند، نه تومان.</span>
-            </div>
-        </div>
-            <div class="field">
-                <label for="brand">
-                    <svg class="icon" aria-hidden="true">
-                        <use href="/assets/icons.svg#tag"/>
-                    </svg>برند
-                </label>
-                <select id="brand" multiple>
-                    <option value="">همه برندها</option>
-                </select>
-            </div>
-            <div class="field">
                 <label for="concern">
                     <svg class="icon" aria-hidden="true">
                         <use href="/assets/icons.svg#heart"/>
@@ -124,6 +97,7 @@
                     <option value="">انتخاب نشده</option>
                 </select>
             </div>
+        </div>
             <div id="shadeField" class="field" hidden>
                 <label for="shade">
                     <svg class="icon" aria-hidden="true">
@@ -133,8 +107,8 @@
                 <select id="shade" multiple>
                     <option value="">همه رنگ‌ها</option>
                 </select>
-            </div>
-            <div id="finishField" class="field" hidden>
+        </div>
+        <div id="finishField" class="field" hidden>
                 <label for="finish">
                     <svg class="icon" aria-hidden="true">
                         <use href="/assets/icons.svg#sparkles"/>
@@ -143,16 +117,16 @@
                 <select id="finish" multiple>
                     <option value="">همه جلوه‌ها</option>
                 </select>
-            </div>
-            <label class="checkbox">
+        </div>
+        <label class="checkbox">
                 <input id="fragranceFree" type="checkbox"/>
                 <svg class="icon" aria-hidden="true">
                     <use href="/assets/icons.svg#leaf"/>
                 </svg>
                 فقط محصولات بدون عطر افزوده
             </label>
-            <div class="field">
-                <label for="excludedIngredients">
+        <div class="field">
+            <label for="excludedIngredients">
                     <svg class="icon" aria-hidden="true">
                         <use href="/assets/icons.svg#flask"/>
                     </svg>ترکیباتی که نمی‌خواهید
@@ -168,6 +142,24 @@
                     برابر حساسیت نیست.
                 </span>
             </div>
+        <div class="field">
+            <label for="maxPrice">
+                <svg class="icon" aria-hidden="true">
+                    <use href="/assets/icons.svg#tag"/>
+                </svg>
+                حداکثر بودجه
+                <span class="muted">(ریال)</span>
+            </label>
+            <input
+                id="maxPrice"
+                type="number"
+                min="0"
+                max="1000000000"
+                step="10000"
+                placeholder="مثلاً ۱۵۰۰۰۰۰"
+                inputmode="numeric"/>
+            <span class="field-hint">قیمت‌ها به ریال هستند، نه تومان.</span>
+        </div>
         <button id="resetFilters" class="button secondary wide" type="button">
             <svg class="icon" aria-hidden="true">
                 <use href="/assets/icons.svg#refresh"/>
@@ -195,6 +187,10 @@
                 <h2>دستیار مراقبت شما</h2>
                 <p id="filterSummary">بدون فیلتر · همه محصولات</p>
             </div>
+            <span id="connectionBadge" class="pill warn" role="status">
+                <span class="dot"></span>
+                <span>در حال اتصال</span>
+            </span>
         </div>
         <button id="newChat" class="button secondary" type="button">
             <svg class="icon" aria-hidden="true">
@@ -210,11 +206,11 @@
                     <use href="/assets/icons.svg#sparkles"/>
                 </svg>
             </div>
-            <h2>مراقبت بهتر، با یک گفت‌وگو.</h2>
+            <h2>مراقبت بهتر، با یک گفت‌وگو</h2>
             <p>
-                کافی است نیازتان را بنویسید؛ هیچ فیلتری اجباری نیست.
+                کافی است نیازتان را بنویسید؛ هیچ فیلتری اجباری نیست
                 <br/>
-                از اطلاعات ثبت‌شده برای پیدا کردن محصول مناسب کمک می‌گیریم.
+                بدون انتخاب فیلتر هم می‌توانید پیام بفرستید. فقط گزینه‌های مورد نیازتان را انتخاب کنید.
             </p>
             <div class="example-list">
                 <button class="example-question" data-example="skin" type="button">
