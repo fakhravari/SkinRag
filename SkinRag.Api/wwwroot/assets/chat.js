@@ -58,15 +58,13 @@
             $(".domain-choice").each(function () {
                 $(this).attr("aria-pressed", String(($(this).data("domain") || null) === domain));
             });
-            $("#skinField").prop("hidden", domain === "hair");
-            $("#hairField").prop("hidden", !!domain && domain !== "hair");
-            $("#shadeField, #finishField").prop("hidden", domain !== "beauty");
+            $("#skinField, #hairField, #shadeField, #finishField").prop("hidden", false);
             if (!preserve) $("#category, #concern, #skinType, #hairType, #shade, #finish").val("");
             if (taxonomy) {
                 fillSelect(
                     "#category",
                     taxonomy.categories.filter(function (c) {
-                        return (!domain || c.domain === domain) && c.parentId != null;
+                        return !domain || c.domain === domain;
                     }),
                     domain ? "همه محصولات " + app.domainNames[domain] : "همه محصولات",
                     preserve,
@@ -121,6 +119,15 @@
                 .request("/api/catalog/filters")
                 .done(function (data) {
                     taxonomy = data;
+                    $("#domainChoices .domain-choice").not('[data-domain=""]').remove();
+                    data.domains.forEach(function (domainName) {
+                        $("#domainChoices").append(
+                            $("<button>")
+                                .attr({ type: "button", "data-domain": domainName, "aria-pressed": "false" })
+                                .addClass("domain-choice")
+                                .text(app.domainNames[domainName] || domainName),
+                        );
+                    });
                     ingredientNames = new Map(
                         data.ingredients.map(function (item) {
                             return [item.slug, item.name];
@@ -246,12 +253,10 @@
                 brandSlug: "#brand",
                 concernSlug: "#concern",
             };
-            if (!domain || domain === "hair") fields.hairType = "#hairType";
-            if (domain !== "hair") fields.skinType = "#skinType";
-            if (domain === "beauty") {
-                fields.shade = "#shade";
-                fields.finish = "#finish";
-            }
+            fields.hairType = "#hairType";
+            fields.skinType = "#skinType";
+            fields.shade = "#shade";
+            fields.finish = "#finish";
             Object.keys(fields).forEach(function (key) {
                 var value = $(fields[key]).val();
                 if (value) request[key] = value;
@@ -623,7 +628,7 @@
             showComposerError("");
             $conversation.scrollTop(0);
         });
-        $(".domain-choice").on("click", function () {
+        $(document).on("click", ".domain-choice", function () {
             setDomain($(this).data("domain"), false);
         });
         $("#toggleFilters").on("click", function () {

@@ -173,7 +173,7 @@ public sealed class KnowledgeIndexService(
         Concerns: {p.Concerns}
         Search terms: {p.SearchKeywords} {string.Join(" ", p.ProductConcerns.OrderBy(x => x.ConcernId).Select(x => x.Concern.SearchTerms))}
         Ingredients: {p.Ingredients}
-        Fragrance free declared: {p.FragranceFree}
+        Fragrance free declared: {(p.FragranceFreeKnown ? p.FragranceFree.ToString() : "unknown")}
         Description: {p.Description}
         Warnings: {p.Warnings}
         Usage: {p.UsageInstructions}

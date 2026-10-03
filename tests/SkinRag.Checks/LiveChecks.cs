@@ -80,7 +80,7 @@ internal static class LiveChecks
         Check(
             hair.GetProperty("items").EnumerateArray().All(p => p.GetProperty("variants").EnumerateArray().All(v => v.GetProperty("stockQuantity").GetInt32() > 0 && v.GetProperty("price").GetDecimal() <= 1500000)),
             "Budget/stock did not match the same variant");
-        var unavailable = await Get("/api/catalog/products?search=DEMO-SKIN-01-05&maxPrice=700000");
+        var unavailable = await Get("/api/catalog/products?search=oily-shampoo-18&maxPrice=700000");
         Check(unavailable.GetProperty("total").GetInt32() == 0, "Sold-out cheaper variant was eligible");
         using (var invalid = await http.GetAsync("/api/catalog/products?skinType=unknown"))
         {

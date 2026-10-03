@@ -110,7 +110,6 @@ public sealed class ConsultationService(
             "none",
             0,
             null,
-            false,
             mode,
             notice,
             intent.Code,
@@ -119,8 +118,7 @@ public sealed class ConsultationService(
             more,
             followUp,
             [],
-            intent.ConversationTopic?.ToString(),
-            intent.Clarification?.ToString());
+            intent.ConversationTopic?.ToString());
         if (!intent.IsRelevant)
         {
             if (intent.Intent is ConsultationIntent.Greeting or ConsultationIntent.SmallTalk)
@@ -192,7 +190,6 @@ public sealed class ConsultationService(
             retrieval.Method,
             retrieval.EligibleProducts,
             retrieval.IndexUpdatedAtUtc,
-            products.Any(p => p.Product.IsDemo),
             mode,
             notice,
             intent.Code,
@@ -201,8 +198,7 @@ public sealed class ConsultationService(
             more,
             followUp,
             products.Where(p => p.Reason is not null).Select(p => new ProductRecommendation(p.Product.Id, p.Reason!)).ToArray(),
-            intent.ConversationTopic?.ToString(),
-            intent.Clarification?.ToString());
+            intent.ConversationTopic?.ToString());
         ConsultationResponse Finish(ConsultationResponse response)
         {
             if (response.Products.Count > 0)
@@ -244,7 +240,7 @@ public sealed class ConsultationService(
         ValidatedConsultation? validated = null;
         string mode = "model";
         string? notice = null;
-        var useGroundedFastPath = plan.Source == "persian-product-rule";
+        var useGroundedFastPath = plan.Source is "persian-product-rule" or "explicit-category-rule" or "explicit-filter-rules" or "filters-only";
         if (useGroundedFastPath)
         {
             mode = "catalog";

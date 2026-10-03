@@ -22,9 +22,9 @@ public sealed class ProductRepository(IDbContextFactory<AppDbContext> factory) :
             await db.Products.AsNoTracking().Where(x => x.IsActive).SelectMany(x => x.Variants).Where(x => x.IsActive && x.Finish != null).Select(x => x.Finish!).Distinct().ToArrayAsync(ct));
     }
 
-    private static IQueryable<Product> Query(AppDbContext db, SearchPlan plan)
+    private static IQueryable<Product> Query(AppDbContext db, SearchPlan plan, CatalogService.CategoryScope? scope)
     {
-        var query = CatalogService.Filter(db.Products.AsNoTracking(), plan.Filters, plan.InStockOnly);
+        var query = CatalogService.Filter(db.Products.AsNoTracking(), plan.Filters, plan.InStockOnly, scope);
         foreach (var slug in plan.ConcernSlugs)
         {
             query = query.Where(p => p.ProductConcerns.Any(x => x.Concern.Slug == slug));
@@ -42,14 +42,17 @@ public sealed class ProductRepository(IDbContextFactory<AppDbContext> factory) :
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         await CatalogService.ValidateFiltersAsync(db, plan.Filters, ct);
-        return await Query(db, plan).Select(p => p.Id).ToArrayAsync(ct);
+        var scope = await CatalogService.ResolveCategoryScopeAsync(db, plan.Filters, ct);
+        return await Query(db, plan, scope).Select(p => p.Id).ToArrayAsync(ct);
     }
 
     public async Task<IReadOnlyList<ProductDto>> LoadAsync(IEnumerable<int> ids, SearchPlan plan, CancellationToken ct)
     {
         var selected = ids.Distinct().Take(100).ToArray();
         await using var db = await factory.CreateDbContextAsync(ct);
-        var rows = await CatalogService.Hydrate(Query(db, plan).Where(p => selected.Contains(p.Id))).ToListAsync(ct);
+        await CatalogService.ValidateFiltersAsync(db, plan.Filters, ct);
+        var scope = await CatalogService.ResolveCategoryScopeAsync(db, plan.Filters, ct);
+        var rows = await CatalogService.Hydrate(Query(db, plan, scope).Where(p => selected.Contains(p.Id))).ToListAsync(ct);
         return rows.Select(p => CatalogService.ToDto(p, plan.Filters, plan.InStockOnly)).ToArray();
     }
 }

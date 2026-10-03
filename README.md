@@ -234,7 +234,7 @@ WHERE Outcome = N'success';
 
 </div>
 
-پاسخ مشاوره فیلدهایی مانند `answer`، `products`، `currency`، `retrievalMethod`، `eligibleProducts`، `indexUpdatedAtUtc`، `isDemo` و `responseMode` دارد. اطلاعات قیمت، موجودی و کارت‌ها را از `products` بخوانید؛ `answer` متن پاسخ گفتگوست.
+پاسخ مشاوره فیلدهایی مانند `answer`، `products`، `currency`، `retrievalMethod`، `eligibleProducts`، `indexUpdatedAtUtc` و `responseMode` دارد. اطلاعات قیمت، موجودی و کارت‌ها را از `products` بخوانید؛ `answer` متن پاسخ گفتگوست.
 
 ## تنظیمات برنامه و مدل‌ها
 

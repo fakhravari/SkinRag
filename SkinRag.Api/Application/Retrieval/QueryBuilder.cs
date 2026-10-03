@@ -1,8 +1,10 @@
 using System.Text.RegularExpressions;
+using System.Globalization;
 using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Consultation;
 using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Application.Parsing;
+using SkinRag.Api.Application.Validation;
 using SkinRag.Api.Infrastructure;
 using SkinRag.Api.Models;
 using SkinRag.Api.Prompts;
@@ -13,6 +15,9 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
 {
     [GeneratedRegex(@"(?:#|\[|شناسه\s*)([0-9]{1,10})(?:\]|\b)")]
     private static partial Regex ProductReferences();
+
+    [GeneratedRegex(@"(?<![\p{L}\p{N}])(?<value>[0-9]+(?:[.,][0-9]+)?)\s*(?<unit>milliliters?|ml|میلی\s*لیتر|میلیلیتر|میل|grams?|g|گرم|pcs|عدد|تایی)(?![\p{L}\p{N}])", RegexOptions.IgnoreCase)]
+    private static partial Regex ExplicitSize();
 
     public async Task<SearchPlan> BuildAsync(
         ConsultationRequest request,
@@ -40,9 +45,17 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         }
 
         var text = PersianText.Normalize(message);
-        var isPersianDrySkinMoisturizer = HasAny(text, "پوست خشک")
-            && HasAny(text, "کرم")
-            && HasAny(text, "مرطوب کننده", "مرطوبکننده");
+        var isPersianDrySkinMoisturizer = decision.Intent == ConsultationIntent.ProductSearch
+            && IsDrySkinMoisturizerRequest(text);
+        var ruleDomain = request.Domain ?? ScopeDomain(text);
+        var ruleAttributeText = PersianText.Normalize($"{text} {request.Concern}");
+        var candidateCategorySlug = decision.Intent == ConsultationIntent.ProductSearch
+            ? ExplicitRuleCategorySlug(text, ruleDomain) ?? MatchUniqueCategory(ruleAttributeText, vocabulary.Categories, ruleDomain)?.Slug
+            : null;
+        var ruleCategorySlug = candidateCategorySlug is not null
+            && (ruleDomain is null || CategoryBelongsToDomain(candidateCategorySlug, ruleDomain, vocabulary.Categories))
+                ? candidateCategorySlug
+                : null;
         var isContextual = decision.Intent == ConsultationIntent.FollowUp
             || HasAny(
             text,
@@ -127,34 +140,23 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
                 Source: "filters-only"));
         }
 
-        if (request.CategorySlug is not null
-            && (request.SkinType is not null || request.HairType is not null || request.Domain == "beauty"))
-        {
-            var explicitFilters = CopyFilters(request);
-            ApplyBudget(explicitFilters, budgetInput, conversation.PendingBudgetRials, conversation.PendingMinimumBudgetRials);
-            return CheckBudgetBounds(new(
-                message,
-                explicitFilters,
-                decision.Intent,
-                request.ConcernSlug is null ? [] : [request.ConcernSlug],
-                HasAny(text, "ارزان", "ارزون", "اقتصادی"),
-                [],
-                Source: "explicit-filters"));
-        }
-
         QueryModelOutput parsed;
         var source = "model";
+        var explicitSize = ParseExplicitSize(text);
+        var ruleOutput = CreateRuleOutput(text, ruleAttributeText, ruleDomain, ruleCategorySlug, vocabulary);
+        var hasRuleFilters = HasRuleFilters(ruleOutput, explicitSize)
+            || HasExplicitRequestFilters(request)
+            || writtenBudget.HasValue
+            || budgetInput.MinimumPriceRials.HasValue;
         if (isPersianDrySkinMoisturizer)
         {
             source = "persian-product-rule";
-            parsed = new()
-            {
-                Query = text,
-                Domain = "skin",
-                SkinType = vocabulary.Profiles.FirstOrDefault(x => x.Kind == "skin" && PersianText.Normalize(x.Name) == "خشک")?.Slug,
-                CategorySlug = vocabulary.Categories.FirstOrDefault(x => x.Slug == "face-moisturizer")?.Slug,
-                PricePreference = HasAny(text, "ارزان", "ارزون", "اقتصادی") ? "budget" : "neutral"
-            };
+            parsed = CreateRuleOutput(text, ruleAttributeText, "skin", "face-moisturizer", vocabulary);
+        }
+        else if (decision.Intent == ConsultationIntent.ProductSearch && hasRuleFilters)
+        {
+            source = ruleCategorySlug is null ? "explicit-filter-rules" : "explicit-category-rule";
+            parsed = ruleOutput;
         }
         else
         {
@@ -168,7 +170,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             logger.LogWarning(
                 "Query extraction unavailable ({ErrorType}); using explicit filters and customer wording",
                 ex.GetType().Name);
-            source = "explicit-filters";
+            source = $"explicit-filters:{ex.GetType().Name}";
             var fallbackText = previous is null ? message : previous + " " + message;
             var fallbackSearchText = $"{fallbackText} {CustomerLanguageQuery.ExpandTerms(fallbackText)}";
             var domain = request.Domain ?? ScopeDomain(fallbackSearchText);
@@ -186,6 +188,11 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         }
 
         var filters = MergeFilters(request, parsed, decision, conversation, vocabulary, writtenBudget);
+        if (filters.SizeValue is null && explicitSize is not null)
+        {
+            filters.SizeValue = explicitSize.Value;
+            filters.SizeUnit = explicitSize.Unit;
+        }
         if (budgetInput.MinimumPriceRials is { } writtenMinimum && request.MinPrice is null)
             filters.MinPrice = writtenMinimum;
         else
@@ -198,8 +205,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             .Distinct()
             .ToArray();
         // Relative requests seek alternatives, rather than being pinned to the earlier product IDs.
-        var budget = parsed.PricePreference == "budget"
-            || HasAny(text, "ارزان", "ارزون", "اقتصادی", "ارزان ترش", "ارزون ترش");
+        var budget = parsed.PricePreference == "budget" || IsBudgetRequest(text);
         return CheckBudgetBounds(new(
             CustomerLanguageQuery.AppendCatalogTerms(parsed.Query, message),
             filters,
@@ -219,7 +225,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             || value.ConcernSlugs.Length > 3
             || value.ExcludeIngredientSlugs is null
             || value.ExcludeIngredientSlugs.Length > 20
-            || value.Domain is not (null or "skin" or "hair" or "beauty"))
+            || value.Domain is not null && !vocabulary.Categories.Any(x => x.Domain == value.Domain))
         {
             return false;
         }
@@ -352,16 +358,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
 
     private static string? ExplicitCategory(string text, string? domain, CatalogVocabulary vocabulary)
     {
-        var slug = domain switch
-        {
-            "skin" when HasAny(text, "ضدآفتاب", "ضد آفتاب") => "sun-screen",
-            "skin" when text.Contains("مرطوب کننده") && HasAny(text, "کرم") => "face-moisturizer",
-            "skin" when HasAny(text, "شوینده") => "gentle-cleanser",
-            "hair" when text.Contains("بدون آبکشی") && HasAny(text, "کرم") => "leave-in",
-            "beauty" when text.Contains("رژ لب") => "lipstick",
-            "beauty" when HasAny(text, "ریمل") => "mascara",
-            _ => null
-        };
+        var slug = ExplicitRuleCategorySlug(text, domain);
         if (vocabulary.Categories.Any(x => x.Slug == slug))
         {
             return slug;
@@ -373,6 +370,243 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             .OrderByDescending(x => x.Score)
             .Select(x => x.Slug)
             .FirstOrDefault();
+    }
+
+    private static bool IsDrySkinMoisturizerRequest(string text)
+    {
+        var drySkin = HasAny(text, "خشک", "خشکه", "خشکی")
+            && HasAny(text, "پوست", "پوستم", "پوستت", "پوستام", "پوستای", "پوستها", "پوست های", "پوستهای", "صورت", "صورتم");
+        var moisturizer = HasAny(text, "مرطوب کننده", "مرطوبکننده", "آبرسان");
+        return drySkin && moisturizer;
+    }
+
+    private static bool IsBudgetRequest(string text) => HasAny(text,
+        "ارزان", "ارزانتر", "ارزان تر", "ارزان قیمت", "قیمت ارزان", "ارزون", "ارزونتر", "ارزون تر",
+        "اقتصادی", "به صرفه", "مقرون به صرفه", "قیمت مناسب");
+
+    private static string? ExplicitRuleCategorySlug(string text, string? domain) => domain switch
+        {
+            "skin" when HasAny(text, "ضدآفتاب", "ضد آفتاب") => "sun-screen",
+            "skin" when HasAny(text, "مرطوب کننده", "مرطوبکننده", "آبرسان", "آبرسانی", "moisturizer", "moisturiser") => "face-moisturizer",
+            "skin" when HasAny(text, "شوینده") => "gentle-cleanser",
+            "hair" when HasAny(text, "کرم")
+                && HasAny(text, "مو", "موی", "موها", "موهای", "موهام")
+                && HasAny(text, "بدون آبکشی", "بدون نیاز به آبکشی", "leave in", "leave-in", "leavein", "بعد حمام", "بعد از حمام", "پس از حمام", "نشورمش", "نشورم") => "leave-in",
+            "beauty" when HasAny(text, "رژلب", "lipstick", "lip stick") || domain == "beauty" && HasAny(text, "رژ") && HasAny(text, "لب") => "lipstick",
+            "beauty" when HasAny(text, "ریمل") => "mascara",
+            _ => null
+        };
+
+    private static Profile? MatchUniqueProfile(string text, IEnumerable<Profile> profiles)
+    {
+        var matches = profiles.Where(x => LabelScore(text, x.Name) > 0).ToArray();
+        return matches.Length == 1 ? matches[0] : null;
+    }
+
+    private static string[] MatchExplicitConcerns(string text, IEnumerable<Concern> concerns)
+    {
+        var matches = concerns.Where(x => LabelScore(text, x.Name + " " + x.SearchTerms) > 0)
+            .Select(x => x.Slug)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        return matches.Length is > 0 and <= 3 ? matches : [];
+    }
+
+    private static string? MatchExplicitCatalogValue(string text, string[]? values)
+    {
+        var matches = (values ?? [])
+            .Where(value => HasAny(text, PersianText.Normalize(value)))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        return matches.Length == 1 ? matches[0] : null;
+    }
+
+    private sealed record ParsedSize(decimal Value, string Unit);
+
+    private static QueryModelOutput CreateRuleOutput(
+        string text,
+        string attributeText,
+        string? domain,
+        string? categorySlug,
+        CatalogVocabulary vocabulary)
+    {
+        var profile = MatchUniqueProfile(attributeText, vocabulary.Profiles.Where(x => domain is null || x.Kind == domain));
+        return new()
+        {
+            Query = text,
+            Domain = domain,
+            CategorySlug = categorySlug,
+            BrandSlug = MatchUniqueBrand(text, vocabulary.Brands)?.Slug,
+            SkinType = profile?.Kind == "skin" ? profile.Slug : null,
+            HairType = profile?.Kind == "hair" ? profile.Slug : null,
+            ConcernSlugs = MatchExplicitConcerns(attributeText, vocabulary.Concerns.Where(x => domain is null || x.Domain == domain)),
+            Shade = domain == "beauty" ? MatchExplicitCatalogValue(text, vocabulary.Shades) : null,
+            Finish = domain == "beauty" ? MatchExplicitCatalogValue(text, vocabulary.Finishes) : null,
+            FragranceFree = ParseFragrancePreference(text),
+            ExcludeIngredientSlugs = MatchExcludedIngredients(text, vocabulary.Ingredients),
+            PricePreference = IsBudgetRequest(text) ? "budget" : "neutral"
+        };
+    }
+
+    private static bool HasRuleFilters(QueryModelOutput parsed, ParsedSize? size) =>
+        parsed.CategorySlug is not null
+        || parsed.BrandSlug is not null
+        || parsed.SkinType is not null
+        || parsed.HairType is not null
+        || parsed.ConcernSlugs.Length > 0
+        || parsed.Shade is not null
+        || parsed.Finish is not null
+        || parsed.FragranceFree.HasValue
+        || parsed.ExcludeIngredientSlugs.Length > 0
+        || parsed.PricePreference == "budget"
+        || size is not null;
+
+    private static bool HasExplicitRequestFilters(ConsultationRequest request) =>
+        request.Domain is not null
+        || request.CategorySlug is not null
+        || request.BrandSlug is not null
+        || request.SkinType is not null
+        || request.HairType is not null
+        || request.ConcernSlug is not null
+        || request.MinPrice.HasValue
+        || request.MaxPrice.HasValue
+        || request.Shade is not null
+        || request.Finish is not null
+        || request.SizeValue.HasValue
+        || request.SizeUnit is not null
+        || request.FragranceFree.HasValue
+        || request.ExcludeIngredientSlugs.Length > 0;
+
+    private static Category? MatchUniqueCategory(string text, IEnumerable<Category> categories, string? domain)
+    {
+        var all = categories.ToArray();
+        var candidates = all.Where(x => domain is null || CategoryBelongsToDomain(x.Slug, domain, all)).ToArray();
+        var exact = candidates.Where(x => HasAny(text, PersianText.Normalize(x.Name))
+                || HasAny(text, PersianText.Normalize(x.Slug.Replace('-', ' '))))
+            .DistinctBy(x => x.Slug)
+            .ToArray();
+        if (exact.Length == 1)
+        {
+            return exact[0];
+        }
+
+        if (exact.Length > 1)
+        {
+            return null;
+        }
+
+        var scored = candidates.Select(x => new { Category = x, Score = LabelScore(text, x.Name) })
+            .Where(x => x.Score > 0)
+            .ToArray();
+        if (scored.Length == 0)
+        {
+            return null;
+        }
+
+        var bestScore = scored.Max(x => x.Score);
+        var best = scored.Where(x => x.Score == bestScore).ToArray();
+        return best.Length == 1 ? best[0].Category : null;
+    }
+
+    private static bool CategoryBelongsToDomain(string slug, string domain, IEnumerable<Category> categories)
+    {
+        var bySlug = categories.ToDictionary(x => x.Slug, StringComparer.Ordinal);
+        if (!bySlug.TryGetValue(slug, out var current))
+        {
+            return false;
+        }
+
+        var byId = bySlug.Values.ToDictionary(x => x.Id);
+        var visited = new HashSet<int>();
+        while (current is not null && visited.Add(current.Id))
+        {
+            if (current.Domain == domain)
+            {
+                return true;
+            }
+
+            current = current.ParentId is { } parentId && byId.TryGetValue(parentId, out var parent) ? parent : null;
+        }
+
+        return false;
+    }
+
+    private static Brand? MatchUniqueBrand(string text, IEnumerable<Brand> brands)
+    {
+        var matches = brands.Where(x => HasAny(text, PersianText.Normalize(x.Name))
+                || HasAny(text, PersianText.Normalize(x.Slug.Replace('-', ' '))))
+            .DistinctBy(x => x.Slug)
+            .ToArray();
+        return matches.Length == 1 ? matches[0] : null;
+    }
+
+    private static bool? ParseFragrancePreference(string text)
+    {
+        var fragranceFree = HasAny(text,
+            "بدون عطر", "بدون رایحه", "فاقد عطر", "فاقد رایحه", "عاری از عطر", "بی عطر", "fragrance free", "unscented");
+        var scented = HasAny(text, "معطر", "عطر دار", "رایحه دار", "scented");
+        return fragranceFree == scented ? null : fragranceFree;
+    }
+
+    private static string[] MatchExcludedIngredients(string text, IEnumerable<Ingredient> ingredients) => ingredients
+        .Where(x => HasNegatedIngredientMention(text, x.Name)
+            || HasNegatedIngredientMention(text, x.InciName)
+            || HasNegatedIngredientMention(text, x.Slug.Replace('-', ' ')))
+        .Select(x => x.Slug)
+        .Distinct(StringComparer.Ordinal)
+        .Take(20)
+        .ToArray();
+
+    private static bool HasNegatedIngredientMention(string text, string term)
+    {
+        var normalizedTerm = PersianText.Normalize(term);
+        if (normalizedTerm.Length == 0)
+        {
+            return false;
+        }
+
+        var padded = $" {text} ";
+        var needle = $" {normalizedTerm} ";
+        var offset = 0;
+        while ((offset = padded.IndexOf(needle, offset, StringComparison.Ordinal)) >= 0)
+        {
+            var before = padded[Math.Max(0, offset - 70)..offset];
+            var afterStart = offset + needle.Length;
+            var after = padded[afterStart..Math.Min(padded.Length, afterStart + 70)];
+            if (HasAny(before, "بدون", "فاقد", "عاری از", "نمیخوام", "نمی خواهم", "نمیخواهم", "free from", "without")
+                || HasAny(after, "نباشد", "نباشه", "نداشته باشد", "نداشته باشه", "نمیخوام", "نمی خواهم", "نمیخواهم", "do not want"))
+            {
+                return true;
+            }
+
+            offset += needle.Length;
+        }
+
+        return false;
+    }
+
+    private static ParsedSize? ParseExplicitSize(string text)
+    {
+        var normalized = PersianText.Normalize(InputNormalizer.Normalize(text));
+        var matches = ExplicitSize().Matches(normalized)
+            .Select(match =>
+            {
+                var rawValue = match.Groups["value"].Value.Replace(',', '.');
+                if (!decimal.TryParse(rawValue, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value))
+                {
+                    return null;
+                }
+
+                var unit = PersianText.Normalize(match.Groups["unit"].Value);
+                var normalizedUnit = unit is "g" or "gram" or "grams" or "گرم" ? "g"
+                    : unit is "pcs" or "عدد" or "تایی" ? "pcs"
+                    : "ml";
+                return value is >= 0.01m and <= 100_000m ? new ParsedSize(value, normalizedUnit) : null;
+            })
+            .Where(x => x is not null)
+            .DistinctBy(x => (x!.Value, x.Unit))
+            .ToArray();
+        return matches.Length == 1 ? matches[0] : null;
     }
 
     private async Task<QueryModelOutput> ExtractModelQueryAsync(
@@ -436,7 +670,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
                 minLength = 1,
                 maxLength = 500
             },
-            ["domain"] = PipelinePrompts.NullableEnum(["skin", "hair", "beauty"]),
+            ["domain"] = PipelinePrompts.NullableEnum(vocabulary.Categories.Select(x => x.Domain).Distinct(StringComparer.Ordinal)),
             ["skinType"] = PipelinePrompts.NullableEnum(scoped.Profiles.Where(x => x.Kind == "skin").Select(x => x.Slug)),
             ["hairType"] = PipelinePrompts.NullableEnum(scoped.Profiles.Where(x => x.Kind == "hair").Select(x => x.Slug)),
             ["categorySlug"] = PipelinePrompts.NullableEnum(scoped.Categories.Select(x => x.Slug)),
@@ -510,7 +744,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         filters.Domain ??= parsed.Domain;
         var category = vocabulary.Categories.FirstOrDefault(x => x.Slug == parsed.CategorySlug);
         if (filters.CategorySlug is null && category is not null
-            && (filters.Domain is null || filters.Domain == category.Domain))
+            && (filters.Domain is null || CategoryBelongsToDomain(category.Slug, filters.Domain, vocabulary.Categories)))
         {
             filters.CategorySlug = category.Slug;
         }

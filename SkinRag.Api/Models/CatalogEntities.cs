@@ -16,7 +16,6 @@ public sealed class Brand
     public string Slug { get; set; } = "";
     public string Name { get; set; } = "";
     public string? Country { get; set; }
-    public bool IsDemo { get; set; }
 }
 
 public sealed class Profile

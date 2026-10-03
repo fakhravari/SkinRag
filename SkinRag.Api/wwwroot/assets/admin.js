@@ -157,10 +157,9 @@
                         },
                     );
                     $("#brandsCount").text(app.number(stats.brands));
-                    $("#demoCount").text(app.number(stats.demoProducts));
                     $("#activeCount").text(app.number(stats.activeProducts));
                     $("#domainStats").empty();
-                    ["skin", "hair", "beauty"].forEach(function (domain) {
+                    Object.keys(app.domainNames).forEach(function (domain) {
                         var entry = stats.domains.find(function (d) {
                             return d.domain === domain;
                         }) || { products: 0, activeProducts: 0 };

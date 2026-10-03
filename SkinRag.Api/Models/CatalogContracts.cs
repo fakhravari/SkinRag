@@ -4,7 +4,7 @@ namespace SkinRag.Api.Models;
 
 public class CatalogFilters : IValidatableObject
 {
-    [RegularExpression("^(skin|hair|beauty)$")]
+    [RegularExpression("^(skin|hair|beauty|personal-care|fragrance|cellulose|promotional|food|other|bundles|campaigns)$")]
     public string? Domain { get; set; }
 
     [MaxLength(80)]
@@ -85,24 +85,23 @@ public sealed record VariantDto(
 
 public sealed record ProductDto(
     int Id,
-    string? Sku,
+    string Sku,
     string Name,
-    string? Brand,
+    string Brand,
     string? BrandSlug,
-    string? Category,
+    string Category,
     string? CategorySlug,
     string? Domain,
     decimal? Price,
     string Currency,
     int StockQuantity,
-    bool IsDemo,
     bool? FragranceFree,
-    string? SkinTypes,
-    string? HairTypes,
-    string? Description,
-    string? Warnings,
-    string? UsageInstructions,
-    string? Image,
+    string SkinTypes,
+    string HairTypes,
+    string Description,
+    string Warnings,
+    string UsageInstructions,
+    string Image,
     string[] Profiles,
     string[] Concerns,
     string[] Ingredients,
@@ -121,7 +120,6 @@ public sealed record ConsultationResponse(
     string RetrievalMethod,
     int EligibleProducts,
     DateTime? IndexUpdatedAtUtc,
-    bool IsDemo,
     string ResponseMode = "model",
     string? Notice = null,
     string Intent = "PRODUCT_SEARCH",

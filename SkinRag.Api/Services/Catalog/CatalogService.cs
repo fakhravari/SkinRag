@@ -6,6 +6,45 @@ namespace SkinRag.Api.Services.Catalog;
 
 public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory)
 {
+    public sealed record CategoryScope(int[]? DomainCategoryIds, int[]? CategoryCategoryIds);
+
+    public static async Task<CategoryScope?> ResolveCategoryScopeAsync(
+        AppDbContext db,
+        CatalogFilters filters,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(filters.Domain) && string.IsNullOrWhiteSpace(filters.CategorySlug))
+        {
+            return null;
+        }
+
+        var categories = await db.Categories.AsNoTracking()
+            .Select(x => new { x.Id, x.ParentId, x.Slug, x.Domain })
+            .ToListAsync(ct);
+
+        int[] Expand(IEnumerable<int> roots)
+        {
+            var included = roots.ToHashSet();
+            var frontier = included.ToArray();
+            while (frontier.Length > 0)
+            {
+                frontier = categories.Where(x => x.ParentId.HasValue && frontier.Contains(x.ParentId.Value) && included.Add(x.Id))
+                    .Select(x => x.Id)
+                    .ToArray();
+            }
+
+            return included.ToArray();
+        }
+
+        var domainIds = string.IsNullOrWhiteSpace(filters.Domain)
+            ? null
+            : Expand(categories.Where(x => x.Domain == filters.Domain).Select(x => x.Id));
+        var categoryIds = string.IsNullOrWhiteSpace(filters.CategorySlug)
+            ? null
+            : Expand(categories.Where(x => x.Slug == filters.CategorySlug).Select(x => x.Id));
+        return new(domainIds, categoryIds);
+    }
+
     public static IQueryable<Product> Hydrate(IQueryable<Product> query) => query.Include(p => p.CategoryDetails).ThenInclude(c => c!.Parent).Include(p => p.BrandDetails)
         .Include(p => p.Variants)
         .Include(p => p.ProductProfiles)
@@ -16,19 +55,23 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory)
         .ThenInclude(x => x.Ingredient)
         .AsSplitQuery();
 
-    public static IQueryable<Product> Filter(IQueryable<Product> query, CatalogFilters f, bool inStockOnly = true)
+    public static IQueryable<Product> Filter(IQueryable<Product> query, CatalogFilters f, bool inStockOnly = true, CategoryScope? scope = null)
     {
         query = query.Where(p => p.IsActive);
         if (!string.IsNullOrWhiteSpace(f.Domain))
         {
-            query = query.Where(p => p.CategoryDetails != null && p.CategoryDetails.Domain == f.Domain);
+            query = scope?.DomainCategoryIds is { } domainCategoryIds
+                ? query.Where(p => domainCategoryIds.Contains(p.CategoryId))
+                : query.Where(p => p.CategoryDetails != null && p.CategoryDetails.Domain == f.Domain);
         }
 
         if (!string.IsNullOrWhiteSpace(f.CategorySlug))
         {
-            query = query.Where(p => p.CategoryDetails != null
-                && (p.CategoryDetails.Slug == f.CategorySlug
-                || (p.CategoryDetails.Parent != null && p.CategoryDetails.Parent.Slug == f.CategorySlug)));
+            query = scope?.CategoryCategoryIds is { } categoryCategoryIds
+                ? query.Where(p => categoryCategoryIds.Contains(p.CategoryId))
+                : query.Where(p => p.CategoryDetails != null
+                    && (p.CategoryDetails.Slug == f.CategorySlug
+                    || (p.CategoryDetails.Parent != null && p.CategoryDetails.Parent.Slug == f.CategorySlug)));
         }
 
         if (!string.IsNullOrWhiteSpace(f.BrandSlug))
@@ -40,14 +83,14 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory)
         {
             query = query.Where(p => p.ProductProfiles.Any(x => x.Profile.Kind == "skin"
                 && (x.Profile.Slug == f.SkinType || x.Profile.Name == f.SkinType || x.Profile.Slug == "skin-all"))
-                || (!p.ProductProfiles.Any() && p.SkinTypes != null && p.SkinTypes.Contains(f.SkinType)));
+                || (!p.ProductProfiles.Any() && p.SkinTypes.Contains(f.SkinType)));
         }
 
         if (!string.IsNullOrWhiteSpace(f.HairType))
         {
             query = query.Where(p => p.ProductProfiles.Any(x => x.Profile.Kind == "hair"
                 && (x.Profile.Slug == f.HairType || x.Profile.Name == f.HairType || x.Profile.Slug == "hair-all"))
-                || (!p.ProductProfiles.Any() && p.HairTypes != null && p.HairTypes.Contains(f.HairType)));
+                || (!p.ProductProfiles.Any() && p.HairTypes.Contains(f.HairType)));
         }
 
         if (!string.IsNullOrWhiteSpace(f.ConcernSlug))
@@ -57,7 +100,7 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory)
 
         if (f.FragranceFree.HasValue)
         {
-            query = query.Where(p => p.FragranceFree == f.FragranceFree);
+            query = query.Where(p => p.FragranceFreeKnown && p.FragranceFree == f.FragranceFree);
         }
 
         if (f.ExcludeIngredientSlugs.Length > 0)
@@ -112,8 +155,7 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory)
             price,
             p.Currency,
             stock,
-            p.IsDemo,
-            p.FragranceFree,
+            p.FragranceFreeKnown ? p.FragranceFree : null,
             p.SkinTypes,
             p.HairTypes,
             p.Description,
@@ -172,12 +214,13 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await ValidateFiltersAsync(db, request, ct);
-        var query = Filter(db.Products.AsNoTracking(), request, request.InStockOnly);
+        var scope = await ResolveCategoryScopeAsync(db, request, ct);
+        var query = Filter(db.Products.AsNoTracking(), request, request.InStockOnly, scope);
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             query = query.Where(p => p.Name.Contains(request.Search)
-                || (p.SearchKeywords != null && p.SearchKeywords.Contains(request.Search))
-                || (p.Sku != null && p.Sku.Contains(request.Search)));
+                || p.SearchKeywords.Contains(request.Search)
+                || p.Sku.Contains(request.Search));
         }
 
         var total = await query.CountAsync(ct);

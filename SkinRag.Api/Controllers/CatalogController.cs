@@ -28,7 +28,7 @@ public sealed class CatalogController(CatalogService catalog, IDbContextFactory<
         {
             currency = "IRR",
             priceUnit = "ریال",
-            domains = new[] { "skin", "hair", "beauty" },
+            domains = await db.Categories.AsNoTracking().Select(x => x.Domain).Distinct().OrderBy(x => x).ToListAsync(ct),
             categories = await db.Categories.AsNoTracking().OrderBy(x => x.Id).Select(x => new { x.Id, x.Slug, x.Name, x.Domain, x.ParentId }).ToListAsync(ct),
             brands = await db.Brands.AsNoTracking().OrderBy(x => x.Id).ToListAsync(ct),
             profiles = await db.Profiles.AsNoTracking().OrderBy(x => x.Id).ToListAsync(ct),
@@ -48,7 +48,6 @@ public sealed class CatalogController(CatalogService catalog, IDbContextFactory<
             totalProducts = await db.Products.CountAsync(ct),
             activeProducts = await db.Products.CountAsync(p => p.IsActive, ct),
             availableProducts = await CatalogService.Filter(db.Products, new CatalogFilters()).CountAsync(ct),
-            demoProducts = await db.Products.CountAsync(p => p.IsDemo, ct),
             variants = await db.ProductVariants.CountAsync(ct),
             categories = await db.Categories.CountAsync(ct),
             brands = await db.Brands.CountAsync(ct),

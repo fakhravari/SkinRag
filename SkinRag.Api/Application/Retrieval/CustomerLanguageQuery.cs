@@ -107,21 +107,24 @@ public static class CustomerLanguageQuery
 
     public static string ExpandTerms(string customerMessage)
     {
-        var text = PersianText.Normalize(customerMessage);
-        return string.Join(' ', Mappings
-            .Where(mapping => mapping.Phrases.Any(phrase => text.Contains(PersianText.Normalize(phrase), StringComparison.Ordinal)))
-            .Select(mapping => mapping.Terms)
-            .Distinct(StringComparer.Ordinal));
+        return string.Join(' ', MatchingTerms(customerMessage));
     }
 
     public static string AppendCatalogTerms(string catalogQuery, string customerMessage)
     {
-        var additions = ExpandTerms(customerMessage);
-        if (string.IsNullOrWhiteSpace(additions))
-        {
-            return catalogQuery;
-        }
+        var query = PersianText.Normalize(catalogQuery);
+        var additions = MatchingTerms(customerMessage)
+            .Where(term => string.IsNullOrWhiteSpace(query)
+                || !query.Contains(PersianText.Normalize(term), StringComparison.Ordinal));
+        return string.Join(' ', new[] { catalogQuery, string.Join(' ', additions) }.Where(x => !string.IsNullOrWhiteSpace(x))).Trim();
+    }
 
-        return string.Join(' ', catalogQuery, additions).Trim();
+    private static IEnumerable<string> MatchingTerms(string customerMessage)
+    {
+        var text = PersianText.Normalize(customerMessage);
+        return Mappings
+            .Where(mapping => mapping.Phrases.Any(phrase => text.Contains(PersianText.Normalize(phrase), StringComparison.Ordinal)))
+            .Select(mapping => mapping.Terms)
+            .Distinct(StringComparer.Ordinal);
     }
 }

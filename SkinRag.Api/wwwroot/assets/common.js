@@ -1,7 +1,19 @@
 (function ($) {
     "use strict";
     var numberFormat = new Intl.NumberFormat("fa-IR");
-    var domainNames = { skin: "پوست", hair: "مو", beauty: "زیبایی" };
+    var domainNames = {
+        skin: "پوست",
+        hair: "مو",
+        beauty: "زیبایی",
+        "personal-care": "بهداشتی و مراقبتی",
+        fragrance: "خوشبو کننده",
+        cellulose: "سلولزی",
+        promotional: "کالای تبلیغاتی",
+        food: "خوراکی",
+        other: "محصولات دیگر",
+        bundles: "بسته های ترکیبی",
+        campaigns: "جشنواره",
+    };
     window.SkinRag = {
         domainNames: domainNames,
         number: function (value) {
