@@ -1,0 +1,9 @@
+namespace SkinRag.Api.Domain.Catalog;
+
+public sealed class Ingredient
+{
+    public int Id { get; set; }
+    public string Slug { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string InciName { get; set; } = "";
+}

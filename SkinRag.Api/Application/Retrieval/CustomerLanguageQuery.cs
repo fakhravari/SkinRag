@@ -1,4 +1,4 @@
-using SkinRag.Api.Infrastructure;
+using SkinRag.Api.Application.Common.Text;
 
 namespace SkinRag.Api.Application.Retrieval;
 

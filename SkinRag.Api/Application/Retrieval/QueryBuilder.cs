@@ -5,9 +5,11 @@ using SkinRag.Api.Application.Consultation;
 using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Application.Parsing;
 using SkinRag.Api.Application.Validation;
-using SkinRag.Api.Infrastructure;
-using SkinRag.Api.Models;
-using SkinRag.Api.Prompts;
+using SkinRag.Api.Application.Common.Text;
+using SkinRag.Api.Application.Contracts.Catalog;
+using SkinRag.Api.Application.Contracts.Consultation;
+using SkinRag.Api.Domain.Catalog;
+using SkinRag.Api.Application.Prompts;
 
 namespace SkinRag.Api.Application.Retrieval;
 
@@ -50,7 +52,11 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         var ruleDomain = request.Domain ?? ResolveDomain(text, vocabulary.Categories);
         var ruleAttributeText = PersianText.Normalize($"{text} {request.Concern}");
         var candidateCategorySlug = decision.Intent == ConsultationIntent.ProductSearch
-            ? ExplicitRuleCategorySlug(text, ruleDomain) ?? MatchUniqueCategory(ruleAttributeText, vocabulary.Categories, ruleDomain)?.Slug
+            // Prefer a catalog label the customer actually used over a broad rule.
+            // For example, "سرم آبرسان" must stay a serum instead of being rewritten
+            // to the general face-moisturizer category by the word "آبرسان".
+            ? MatchUniqueCategory(ruleAttributeText, vocabulary.Categories, ruleDomain)?.Slug
+                ?? ExplicitRuleCategorySlug(text, ruleDomain)
             : null;
         var ruleCategorySlug = candidateCategorySlug is not null
             && (ruleDomain is null || CategoryBelongsToDomain(candidateCategorySlug, ruleDomain, vocabulary.Categories))
@@ -215,6 +221,13 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         if (request.ConcernSlug is null && filters.Domain == "beauty" && filters.Finish is not null)
         {
             concerns = concerns.Where(s => s is not ("matte-look" or "glow-look")).ToArray();
+        }
+        // A curly hair profile describes the customer's hair. It does not mean a
+        // leave-in cream must also be tagged as a curl-styling product.
+        if (request.ConcernSlug is null && filters.Domain == "hair"
+            && filters.CategorySlug == "leave-in" && filters.HairType == "hair-curly")
+        {
+            concerns = concerns.Where(s => s != "curl-style").ToArray();
         }
 
         // Relative requests seek alternatives, rather than being pinned to the earlier product IDs.
@@ -506,10 +519,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         {
             var maximumSpecificity = exact.Max(x => PersianText.SearchTokens(x.Name).Count());
             var mostSpecific = exact.Where(x => PersianText.SearchTokens(x.Name).Count() == maximumSpecificity).ToArray();
-            if (mostSpecific.Length == 1
-                && (heuristicDomain is null
-                    || mostSpecific[0].Domain == heuristicDomain
-                    || maximumSpecificity >= 2))
+            if (mostSpecific.Length == 1)
             {
                 return mostSpecific[0].Domain;
             }
@@ -551,19 +561,40 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
     private static Category? MatchUniqueCategory(string text, IEnumerable<Category> categories, string? domain)
     {
         var all = categories.ToArray();
-        var candidates = all.Where(x => domain is null || CategoryBelongsToDomain(x.Slug, domain, all)).ToArray();
+        // A selected domain scopes category inference to categories actually
+        // assigned to it. Ancestor-domain checks can pull a same-name category
+        // from a different normalized domain into the match set.
+        var candidates = all.Where(x => domain is null || x.Domain == domain).ToArray();
         var exact = candidates.Where(x => HasAny(text, PersianText.Normalize(x.Name))
                 || HasAny(text, PersianText.Normalize(x.Slug.Replace('-', ' '))))
             .DistinctBy(x => x.Slug)
             .ToArray();
-        if (exact.Length == 1)
+        if (exact.Length > 0)
         {
-            return exact[0];
-        }
+            var maxSpecificity = exact.Max(x => PersianText.SearchTokens(x.Name).Count());
+            var mostSpecific = exact.Where(x => PersianText.SearchTokens(x.Name).Count() == maxSpecificity).ToArray();
+            if (mostSpecific.Length == 1)
+                return mostSpecific[0];
 
-        if (exact.Length > 1)
-        {
-            return null;
+            // Duplicate labels often represent an imported parent and its
+            // normalized leaf. Resolve toward the deepest category; equal-depth
+            // duplicates remain ambiguous and are left for the model to clarify.
+            var byId = all.ToDictionary(x => x.Id);
+            int Depth(Category category)
+            {
+                var depth = 0;
+                var current = category;
+                var visited = new HashSet<int> { current.Id };
+                while (current.ParentId is { } parentId && byId.TryGetValue(parentId, out var parent) && visited.Add(parent.Id))
+                {
+                    depth++;
+                    current = parent;
+                }
+                return depth;
+            }
+            var maxDepth = mostSpecific.Max(Depth);
+            var deepest = mostSpecific.Where(x => Depth(x) == maxDepth).ToArray();
+            return deepest.Length == 1 ? deepest[0] : null;
         }
 
         var scored = candidates.Select(x => new { Category = x, Score = LabelScore(text, x.Name) })

@@ -1,13 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Retrieval;
-using SkinRag.Api.Data;
-using SkinRag.Api.Models;
-using SkinRag.Api.Services.Catalog;
+using SkinRag.Api.Infrastructure.Persistence;
+using SkinRag.Api.Application.Contracts.Catalog;
+using SkinRag.Api.Application.Contracts.Consultation;
+using SkinRag.Api.Domain.Catalog;
+using SkinRag.Api.Infrastructure.Catalog;
 
 namespace SkinRag.Api.Infrastructure.Persistence;
 
-public sealed class ProductRepository(IDbContextFactory<AppDbContext> factory) : IProductRepository
+public sealed class ProductRepository(IDbContextFactory<SkinRagDbContext> factory) : IProductRepository
 {
     public async Task<CatalogVocabulary> VocabularyAsync(CancellationToken ct)
     {
@@ -22,9 +24,9 @@ public sealed class ProductRepository(IDbContextFactory<AppDbContext> factory) :
             await db.Products.AsNoTracking().Where(x => x.IsActive).SelectMany(x => x.Variants).Where(x => x.IsActive && x.Finish != null).Select(x => x.Finish!).Distinct().ToArrayAsync(ct));
     }
 
-    private static IQueryable<Product> Query(AppDbContext db, SearchPlan plan, CatalogService.CategoryScope? scope)
+    private static IQueryable<Product> Query(SkinRagDbContext db, SearchPlan plan, CatalogQueryService.CategoryScope? scope)
     {
-        var query = CatalogService.Filter(db.Products.AsNoTracking(), plan.Filters, plan.InStockOnly, scope);
+        var query = CatalogQueryService.Filter(db.Products.AsNoTracking(), plan.Filters, plan.InStockOnly, scope);
         foreach (var slug in plan.ConcernSlugs)
         {
             query = query.Where(p => p.ProductConcerns.Any(x => x.Concern.Slug == slug));
@@ -41,8 +43,8 @@ public sealed class ProductRepository(IDbContextFactory<AppDbContext> factory) :
     public async Task<int[]> EligibleIdsAsync(SearchPlan plan, CancellationToken ct)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
-        await CatalogService.ValidateFiltersAsync(db, plan.Filters, ct);
-        var scope = await CatalogService.ResolveCategoryScopeAsync(db, plan.Filters, ct);
+        await CatalogQueryService.ValidateFiltersAsync(db, plan.Filters, ct);
+        var scope = await CatalogQueryService.ResolveCategoryScopeAsync(db, plan.Filters, ct);
         return await Query(db, plan, scope).Select(p => p.Id).ToArrayAsync(ct);
     }
 
@@ -50,9 +52,9 @@ public sealed class ProductRepository(IDbContextFactory<AppDbContext> factory) :
     {
         var selected = ids.Distinct().Take(100).ToArray();
         await using var db = await factory.CreateDbContextAsync(ct);
-        await CatalogService.ValidateFiltersAsync(db, plan.Filters, ct);
-        var scope = await CatalogService.ResolveCategoryScopeAsync(db, plan.Filters, ct);
-        var rows = await CatalogService.Hydrate(Query(db, plan, scope).Where(p => selected.Contains(p.Id))).ToListAsync(ct);
-        return rows.Select(p => CatalogService.ToDto(p, plan.Filters, plan.InStockOnly)).ToArray();
+        await CatalogQueryService.ValidateFiltersAsync(db, plan.Filters, ct);
+        var scope = await CatalogQueryService.ResolveCategoryScopeAsync(db, plan.Filters, ct);
+        var rows = await CatalogQueryService.Hydrate(Query(db, plan, scope).Where(p => selected.Contains(p.Id))).ToListAsync(ct);
+        return rows.Select(p => CatalogQueryService.ToDto(p, plan.Filters, plan.InStockOnly)).ToArray();
     }
 }

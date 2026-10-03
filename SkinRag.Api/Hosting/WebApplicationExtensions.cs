@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using SkinRag.Api.Data;
-using SkinRag.Api.Services.Knowledge;
+using SkinRag.Api.Infrastructure.Persistence;
+using SkinRag.Api.Application.Abstractions;
 
 namespace SkinRag.Api.Hosting;
 
@@ -32,7 +32,7 @@ public static class WebApplicationExtensions
         app.MapGet("/", () => Results.Redirect("/chat"));
         app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
         app.MapGet("/health/ready",
-            async (IDbContextFactory<AppDbContext> factory, KnowledgeIndexService index, CancellationToken ct) =>
+            async (IDbContextFactory<SkinRagDbContext> factory, IKnowledgeIndex index, CancellationToken ct) =>
             {
                 await using var db = await factory.CreateDbContextAsync(ct);
                 var databaseReady = await db.Database.CanConnectAsync(ct);

@@ -1,6 +1,6 @@
 using System.Collections.Frozen;
 using System.Text.RegularExpressions;
-using SkinRag.Api.Infrastructure;
+using SkinRag.Api.Application.Common.Text;
 
 namespace SkinRag.Api.Application.Intent;
 

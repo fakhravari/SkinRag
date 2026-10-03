@@ -6,9 +6,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using SkinRag.Api.Application.Consultation;
 using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Application.Validation;
-using SkinRag.Api.Infrastructure.Ollama;
-using SkinRag.Api.Services;
-using SkinRag.Api.Services.Telemetry;
+using SkinRag.Api.Infrastructure.Integrations.Ollama;
+using SkinRag.Api.Infrastructure.Telemetry;
 
 internal static class IntentChecks
 {

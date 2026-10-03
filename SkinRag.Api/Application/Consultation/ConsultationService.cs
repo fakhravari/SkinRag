@@ -6,9 +6,11 @@ using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Application.Parsing;
 using SkinRag.Api.Application.Retrieval;
 using SkinRag.Api.Application.Validation;
-using SkinRag.Api.Models;
-using SkinRag.Api.Prompts;
-using SkinRag.Api.Services.Telemetry;
+using SkinRag.Api.Application.Telemetry;
+using SkinRag.Api.Application.Contracts.Catalog;
+using SkinRag.Api.Application.Contracts.Consultation;
+using SkinRag.Api.Domain.Catalog;
+using SkinRag.Api.Application.Prompts;
 
 namespace SkinRag.Api.Application.Consultation;
 
@@ -21,7 +23,7 @@ public sealed class ConsultationService(
     IOllamaClient ollama,
     RecommendationValidator validator,
     ConversationStore conversations,
-    ConsultationPerformanceQueue performanceQueue,
+    IConsultationPerformanceSink performanceSink,
     IConfiguration configuration,
     ILogger<ConsultationService> logger)
 {
@@ -59,7 +61,7 @@ public sealed class ConsultationService(
             totalTimer.Stop();
             timing.CompletedAtLocal = DateTime.Now;
             timing.TotalMs = (long)totalTimer.Elapsed.TotalMilliseconds;
-            performanceQueue.Enqueue(timing);
+            performanceSink.Enqueue(timing);
         }
     }
 
@@ -334,7 +336,7 @@ public sealed class ConsultationService(
 
     private static bool IsRecommendationRequest(string message)
     {
-        var text = SkinRag.Api.Infrastructure.PersianText.Normalize(message);
+        var text = SkinRag.Api.Application.Common.Text.PersianText.Normalize(message);
         return text.Contains("معرفی", StringComparison.Ordinal)
             || text.Contains("پیشنهاد", StringComparison.Ordinal)
             || text.Contains("نشون بده", StringComparison.Ordinal)

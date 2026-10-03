@@ -5,8 +5,10 @@ using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Application.Parsing;
 using SkinRag.Api.Application.Retrieval;
 using SkinRag.Api.Application.Validation;
-using SkinRag.Api.Models;
-using SkinRag.Api.Services.Telemetry;
+using SkinRag.Api.Application.Contracts.Catalog;
+using SkinRag.Api.Application.Contracts.Consultation;
+using SkinRag.Api.Domain.Catalog;
+using SkinRag.Api.Infrastructure.Telemetry;
 
 internal static class BudgetChecks
 {

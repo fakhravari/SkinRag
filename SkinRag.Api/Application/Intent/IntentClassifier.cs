@@ -1,8 +1,8 @@
 using System.Text.RegularExpressions;
 using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Parsing;
-using SkinRag.Api.Infrastructure;
-using SkinRag.Api.Prompts;
+using SkinRag.Api.Application.Common.Text;
+using SkinRag.Api.Application.Prompts;
 
 namespace SkinRag.Api.Application.Intent;
 

@@ -1,7 +1,9 @@
 using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Consultation;
 using SkinRag.Api.Application.Retrieval;
-using SkinRag.Api.Models;
+using SkinRag.Api.Application.Contracts.Catalog;
+using SkinRag.Api.Application.Contracts.Consultation;
+using SkinRag.Api.Domain.Catalog;
 
 namespace SkinRag.Api.Application.Validation;
 

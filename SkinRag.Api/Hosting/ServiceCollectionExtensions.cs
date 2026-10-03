@@ -4,13 +4,12 @@ using SkinRag.Api.Application.Consultation;
 using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Application.Retrieval;
 using SkinRag.Api.Application.Validation;
-using SkinRag.Api.Data;
-using SkinRag.Api.Infrastructure;
-using SkinRag.Api.Infrastructure.Ollama;
 using SkinRag.Api.Infrastructure.Persistence;
-using SkinRag.Api.Services.Catalog;
-using SkinRag.Api.Services.Knowledge;
-using SkinRag.Api.Services.Telemetry;
+using SkinRag.Api.Infrastructure.Integrations.Ollama;
+using SkinRag.Api.Infrastructure.Catalog;
+using SkinRag.Api.Infrastructure.Knowledge;
+using SkinRag.Api.Infrastructure.Telemetry;
+using SkinRag.Api.Presentation.Middleware;
 
 namespace SkinRag.Api.Hosting;
 
@@ -36,9 +35,10 @@ public static class ServiceCollectionExtensions
 
     private static void AddDataServices(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDbContextFactory<AppDbContext>(options => options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
+        services.AddDbContextFactory<SkinRagDbContext>(options => options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
         services.AddScoped<IProductRepository, ProductRepository>();
-        services.AddScoped<CatalogService>();
+        services.AddScoped<CatalogQueryService>();
+        services.AddScoped<ICatalogQueryService>(provider => provider.GetRequiredService<CatalogQueryService>());
     }
 
     private static void AddModelServices(IServiceCollection services, IConfiguration configuration)
@@ -52,8 +52,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<OllamaClient>();
         services.AddSingleton<IOllamaClient>(provider => provider.GetRequiredService<OllamaClient>());
         services.AddSingleton<KnowledgeIndexService>();
-        services.AddHostedService<KnowledgeIndexWorker>();
+        services.AddSingleton<IKnowledgeIndex>(provider => provider.GetRequiredService<KnowledgeIndexService>());
+        services.AddHostedService<KnowledgeIndexBackgroundService>();
         services.AddSingleton<ConsultationPerformanceQueue>();
+        services.AddSingleton<IConsultationPerformanceSink>(provider => provider.GetRequiredService<ConsultationPerformanceQueue>());
         services.AddHostedService(provider => provider.GetRequiredService<ConsultationPerformanceQueue>());
     }
 

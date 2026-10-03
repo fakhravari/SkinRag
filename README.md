@@ -116,7 +116,7 @@ dotnet run --project SkinRag.Api
 
 ### گام ۶: ابتدا SQL محصولات مجاز را غربال می‌کند
 
-در ProductRepository و CatalogService پرس‌وجوی SQL با شرط‌های SearchPlan ساخته می‌شود. این مرحله ابتدا شناسهٔ محصولاتی را پیدا می‌کند که از فیلترهای اجباری عبور کرده‌اند. شرایط می‌توانند شامل این موارد باشند:
+در ProductRepository و CatalogQueryService پرس‌وجوی SQL با شرط‌های SearchPlan ساخته می‌شود. این مرحله ابتدا شناسهٔ محصولاتی را پیدا می‌کند که از فیلترهای اجباری عبور کرده‌اند. شرایط می‌توانند شامل این موارد باشند:
 
 - فعال‌بودن محصول و قرارگرفتن آن در حوزه یا دسته‌بندی انتخاب‌شده.
 - برند، نوع پوست، نوع مو و نیاز مراقبتی.
@@ -175,7 +175,7 @@ dotnet run --project SkinRag.Api
 
 ## نمایهٔ دانش و embeddingها
 
-نمایهٔ دانش در شروع برنامه و سپس در فاصله‌های دوره‌ای توسط KnowledgeIndexWorker بازسازی می‌شود. فاصلهٔ پیش‌فرض ۳۰۰ ثانیه است. KnowledgeIndexService محصولات فعال را از SQL می‌خواند، متن جست‌وجو را از نام، حوزه، دسته، برند، ویژگی‌ها، نیازها، واژه‌های جست‌وجو، ترکیبات، توضیحات، روش مصرف و variantها می‌سازد و برای آن embedding می‌گیرد.
+نمایهٔ دانش در شروع برنامه و سپس در فاصله‌های دوره‌ای توسط KnowledgeIndexBackgroundService بازسازی می‌شود. فاصلهٔ پیش‌فرض ۳۰۰ ثانیه است. KnowledgeIndexService محصولات فعال را از SQL می‌خواند، متن جست‌وجو را از نام، حوزه، دسته، برند، ویژگی‌ها، نیازها، واژه‌های جست‌وجو، ترکیبات، توضیحات، روش مصرف و variantها می‌سازد و برای آن embedding می‌گیرد.
 
 بردارها در جدول ProductEmbeddings با مدل، ابعاد، هش محتوای منبع و زمان به‌روزرسانی cache می‌شوند. اگر هش متن، نسخهٔ embedding یا پیشوند متن تغییر نکرده باشد، بردار ذخیره‌شده دوباره استفاده می‌شود. snapshot آمادهٔ جست‌وجو در حافظهٔ پردازه قرار می‌گیرد؛ قیمت و موجودی در این snapshot مرجع نهایی نیستند.
 
@@ -282,26 +282,26 @@ dotnet run --project SkinRag.Api
 
 ## ساختار پوشه‌ها
 
-| مسئولیت | مسیر |
-| --- | --- |
-| هماهنگی درخواست، وضعیت مکالمه و قالب‌بندی پاسخ | SkinRag.Api/Application/Consultation |
-| دسته‌بندی نیت، موضوع مکالمه و پرسش پیگیری | SkinRag.Api/Application/Intent |
-| استخراج بودجه و بازهٔ قیمت از متن | SkinRag.Api/Application/Parsing |
-| ساخت برنامهٔ جست‌وجو، بازیابی و رتبه‌بندی محصول | SkinRag.Api/Application/Retrieval |
-| کنترل ورودی و اعتبارسنجی پاسخ و پیشنهاد | SkinRag.Api/Application/Validation |
-| قراردادهای مخزن داده و سرویس مدل | SkinRag.Api/Application/Abstractions |
-| endpointهای صفحه، مشاوره، کاتالوگ و نمایه | SkinRag.Api/Controllers |
-| AppDbContext و نگاشت موجودیت‌ها به SQL | SkinRag.Api/Data |
-| پرس‌وجوهای SQL با EF Core | SkinRag.Api/Infrastructure/Persistence |
-| ارتباط HTTP با Ollama و خواندن پاسخ ساخت‌یافته | SkinRag.Api/Infrastructure/Ollama |
-| فیلتر و تبدیل اطلاعات کاتالوگ | SkinRag.Api/Services/Catalog |
-| snapshot جست‌وجو و بازسازی دوره‌ای embedding | SkinRag.Api/Services/Knowledge |
-| صف پس‌زمینه و ذخیرهٔ گزارش عملکرد | SkinRag.Api/Services/Telemetry |
-| موجودیت‌ها و قراردادهای ورودی و خروجی | SkinRag.Api/Models |
-| promptها و schemaهای خروجی مدل | SkinRag.Api/Prompts |
-| صفحات Razor، دارایی‌های رابط و قلم‌ها | SkinRag.Api/Views و SkinRag.Api/wwwroot |
-| نسخهٔ پشتیبان و اسکریپت‌های SQL | database |
-| بررسی‌های مستقل منطق و قراردادهای داده | tests/SkinRag.Checks |
+کل سامانه در همان پروژه و اسمبلی واحد `SkinRag.Api` باقی مانده است. لایه‌ها با پوشه و namespace جدا شده‌اند و پروژهٔ جداگانه‌ای اضافه نشده است.
+
+| لایه | مسئولیت | مسیر |
+| --- | --- | --- |
+| دامنه | موجودیت‌های کاتالوگ و قواعد مستقل از وب و پایگاه داده | `SkinRag.Api/Domain/Catalog` |
+| کاربرد | جریان مشاوره، نیت، جست‌وجو، اعتبارسنجی و قراردادهای ورودی و خروجی | `SkinRag.Api/Application` |
+| قراردادهای کاتالوگ | فیلترها، درخواست جست‌وجو، مشخصات محصول و گزینه‌های فیلتر | `SkinRag.Api/Application/Contracts/Catalog` |
+| قراردادهای مشاوره | درخواست و پاسخ مکالمه | `SkinRag.Api/Application/Contracts/Consultation` |
+| مرزهای کاربرد | رابط مخزن، مدل زبانی، نمایهٔ دانش، کاتالوگ و ثبت عملکرد | `SkinRag.Api/Application/Abstractions` |
+| زیرساخت | EF Core، `SkinRagDbContext`، مخزن SQL و موجودیت‌های ذخیره‌سازی | `SkinRag.Api/Infrastructure/Persistence` |
+| خواندن کاتالوگ | فیلتر محصولات، صفحه‌بندی، نگاشت خروجی و آمار | `SkinRag.Api/Infrastructure/Catalog` |
+| اتصال مدل | ارتباط HTTP با Ollama | `SkinRag.Api/Infrastructure/Integrations/Ollama` |
+| نمایهٔ دانش | ذخیرهٔ embedding، بازسازی نمایه و کار پس‌زمینه | `SkinRag.Api/Infrastructure/Knowledge` |
+| پایش | صف و ذخیرهٔ زمان‌بندی درخواست‌ها | `SkinRag.Api/Infrastructure/Telemetry` |
+| ارائه | کنترلرها و middlewareهای HTTP | `SkinRag.Api/Presentation` |
+| ترکیب برنامه | ثبت وابستگی‌ها و پیکربندی pipeline در نقطهٔ شروع | `SkinRag.Api/Hosting` و `SkinRag.Api/Program.cs` |
+| رابط وب | صفحه‌های Razor، فایل‌های ایستا و قلم‌ها؛ در ریشه می‌مانند تا قراردادهای پیش‌فرض ASP.NET حفظ شوند | `SkinRag.Api/Views` و `SkinRag.Api/wwwroot` |
+| بررسی‌ها و داده | بررسی‌های مستقل و اسکریپت‌های SQL | `tests/SkinRag.Checks` و `database` |
+
+وابستگی در سطح namespace از ارائه به کاربرد و از زیرساخت به کاربرد و دامنه حرکت می‌کند. کاربرد با زیرساخت از طریق interfaceهای تعریف‌شده در `Application/Abstractions` ارتباط می‌گیرد؛ ثبت پیاده‌سازی‌ها در نقطهٔ ترکیب برنامه انجام می‌شود.
 
 ## اجرای بررسی‌های پروژه
 

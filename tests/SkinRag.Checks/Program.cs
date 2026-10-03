@@ -6,13 +6,15 @@ using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Consultation;
 using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Application.Retrieval;
+using SkinRag.Api.Application.Knowledge;
 using SkinRag.Api.Application.Validation;
-using SkinRag.Api.Infrastructure;
-using SkinRag.Api.Infrastructure.Ollama;
+using SkinRag.Api.Application.Common.Text;
+using SkinRag.Api.Infrastructure.Integrations.Ollama;
 using SkinRag.Api.Infrastructure.Persistence;
-using SkinRag.Api.Models;
-using SkinRag.Api.Services;
-using SkinRag.Api.Services.Telemetry;
+using SkinRag.Api.Application.Contracts.Catalog;
+using SkinRag.Api.Application.Contracts.Consultation;
+using SkinRag.Api.Domain.Catalog;
+using SkinRag.Api.Infrastructure.Telemetry;
 
 var checks = 0;
 void Check(bool condition, string message)
