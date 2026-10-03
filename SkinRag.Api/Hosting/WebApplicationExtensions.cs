@@ -22,7 +22,6 @@ public static class WebApplicationExtensions
 
         app.UseStaticFiles();
         app.UseRouting();
-        app.UseRateLimiter();
         app.UseAuthorization();
         return app;
     }

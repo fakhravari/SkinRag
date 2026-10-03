@@ -58,8 +58,6 @@
                 return Object.values(data.errors).flat().slice(0, 4).join(" ");
             }
             if (data && data.title) return data.title;
-            if (xhr.status === 429)
-                return "تعداد درخواست‌ها زیاد است؛ یک دقیقه بعد دوباره تلاش کنید.";
             if (xhr.status === 401) return "کلید مدیریت معتبر نیست یا دسترسی مجاز نیست.";
             if (xhr.status === 0)
                 return "ارتباط با سرور برقرار نشد؛ اتصال و اجرای برنامه را بررسی کنید.";

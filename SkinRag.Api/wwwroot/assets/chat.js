@@ -55,9 +55,7 @@
 
         function setDomain(value, preserve) {
             domain = value || null;
-            $(".domain-choice").each(function () {
-                $(this).attr("aria-pressed", String(($(this).data("domain") || null) === domain));
-            });
+            $("#domain").val(domain || "");
             $("#skinField, #hairField, #shadeField, #finishField").prop("hidden", false);
             if (!preserve) $("#category, #concern, #skinType, #hairType, #shade, #finish").val("");
             if (taxonomy) {
@@ -119,15 +117,14 @@
                 .request("/api/catalog/filters")
                 .done(function (data) {
                     taxonomy = data;
-                    $("#domainChoices .domain-choice").not('[data-domain=""]').remove();
-                    data.domains.forEach(function (domainName) {
-                        $("#domainChoices").append(
-                            $("<button>")
-                                .attr({ type: "button", "data-domain": domainName, "aria-pressed": "false" })
-                                .addClass("domain-choice")
-                                .text(app.domainNames[domainName] || domainName),
-                        );
-                    });
+                    fillSelect(
+                        "#domain",
+                        data.domains.map(function (domainName) {
+                            return { slug: domainName, name: app.domainNames[domainName] || domainName };
+                        }),
+                        "همه حوزه‌ها",
+                        true,
+                    );
                     ingredientNames = new Map(
                         data.ingredients.map(function (item) {
                             return [item.slug, item.name];
@@ -628,8 +625,8 @@
             showComposerError("");
             $conversation.scrollTop(0);
         });
-        $(document).on("click", ".domain-choice", function () {
-            setDomain($(this).data("domain"), false);
+        $("#domain").on("change", function () {
+            setDomain($(this).val(), false);
         });
         $("#toggleFilters").on("click", function () {
             var expanded = $(this).attr("aria-expanded") !== "true";

@@ -38,7 +38,7 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory)
 
         var domainIds = string.IsNullOrWhiteSpace(filters.Domain)
             ? null
-            : Expand(categories.Where(x => x.Domain == filters.Domain).Select(x => x.Id));
+            : categories.Where(x => x.Domain == filters.Domain).Select(x => x.Id).ToArray();
         var categoryIds = string.IsNullOrWhiteSpace(filters.CategorySlug)
             ? null
             : Expand(categories.Where(x => x.Slug == filters.CategorySlug).Select(x => x.Id));

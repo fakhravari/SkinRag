@@ -1,5 +1,3 @@
-using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Consultation;
@@ -34,24 +32,6 @@ public static class ServiceCollectionExtensions
         services.AddSwaggerGen();
         services.AddProblemDetails();
         services.AddExceptionHandler<ApiExceptionHandler>();
-        services.AddRateLimiter(options =>
-        {
-            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            AddRateLimitPolicy(options, "consultation", 12);
-        });
-    }
-
-    private static void AddRateLimitPolicy(RateLimiterOptions options, string name, int permitLimit)
-    {
-        options.AddPolicy(name, context => RateLimitPartition.GetFixedWindowLimiter(
-            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = permitLimit,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                AutoReplenishment = true
-            }));
     }
 
     private static void AddDataServices(IServiceCollection services, IConfiguration configuration)

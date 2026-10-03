@@ -47,7 +47,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         var text = PersianText.Normalize(message);
         var isPersianDrySkinMoisturizer = decision.Intent == ConsultationIntent.ProductSearch
             && IsDrySkinMoisturizerRequest(text);
-        var ruleDomain = request.Domain ?? ScopeDomain(text);
+        var ruleDomain = request.Domain ?? ResolveDomain(text, vocabulary.Categories);
         var ruleAttributeText = PersianText.Normalize($"{text} {request.Concern}");
         var candidateCategorySlug = decision.Intent == ConsultationIntent.ProductSearch
             ? ExplicitRuleCategorySlug(text, ruleDomain) ?? MatchUniqueCategory(ruleAttributeText, vocabulary.Categories, ruleDomain)?.Slug
@@ -114,7 +114,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         {
             var terms = new List<string>();
             if (request.Domain is { } selectedDomain)
-                terms.Add(selectedDomain switch { "skin" => "پوست", "hair" => "مو", "beauty" => "زیبایی", _ => "" });
+                terms.Add(vocabulary.Categories.FirstOrDefault(x => x.ParentId is null && x.Domain == selectedDomain)?.Name ?? selectedDomain);
             if (request.CategorySlug is { } categorySlug && vocabulary.Categories.FirstOrDefault(x => x.Slug == categorySlug) is { } category)
                 terms.Add(category.Name);
             if (request.SkinType is { } skinType && vocabulary.Profiles.FirstOrDefault(x => x.Slug == skinType) is { } skinProfile)
@@ -173,7 +173,7 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             source = $"explicit-filters:{ex.GetType().Name}";
             var fallbackText = previous is null ? message : previous + " " + message;
             var fallbackSearchText = $"{fallbackText} {CustomerLanguageQuery.ExpandTerms(fallbackText)}";
-            var domain = request.Domain ?? ScopeDomain(fallbackSearchText);
+            var domain = request.Domain ?? ResolveDomain(fallbackSearchText, vocabulary.Categories);
             var profileMatches = vocabulary.Profiles.Where(x => (domain is null || x.Kind == domain) && LabelScore(PersianText.Normalize(fallbackSearchText), x.Name) > 0)
                 .ToArray();
             parsed = new()
@@ -185,6 +185,11 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
                 CategorySlug = ExplicitCategory(PersianText.Normalize(fallbackSearchText), domain, vocabulary)
             };
         }
+        }
+
+        if (ruleDomain is not null)
+        {
+            parsed = ConstrainToDomain(parsed, ruleDomain, ruleCategorySlug, vocabulary.Categories);
         }
 
         var filters = MergeFilters(request, parsed, decision, conversation, vocabulary, writtenBudget);
@@ -243,7 +248,8 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         }
 
         if (value.CategorySlug is not null
-            && !vocabulary.Categories.Any(x => x.Slug == value.CategorySlug && (value.Domain is null || x.Domain == value.Domain)))
+            && !vocabulary.Categories.Any(x => x.Slug == value.CategorySlug
+                && (value.Domain is null || CategoryBelongsToDomain(x.Slug, value.Domain, vocabulary.Categories))))
         {
             return false;
         }
@@ -321,10 +327,24 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
     private static string? ScopeDomain(string message)
     {
         var text = PersianText.Normalize(message);
+        var fragrance = HasAny(text,
+                "خوشبو کننده", "خوشبوکننده", "خوشبو کننده بدن", "عطر", "ادکلن", "بادی اسپلش", "ضد تعریق", "ضدتعریق")
+            && !HasAny(text, "بدون عطر", "بدون رایحه", "فاقد عطر", "فاقد رایحه", "بی عطر", "عاری از عطر");
+        var cellulose = HasAny(text, "سلولزی", "دستمال", "گوش پاک کن", "گوش پاککن", "پد آرایش پاک کن", "نوار بهداشتی", "پد روزانه");
+        var bundles = HasAny(text, "بسته ترکیبی", "بسته های ترکیبی", "بسته‌های ترکیبی", "پک ترکیبی", "بسته محصولات");
+        var campaigns = HasAny(text, "جشنواره شگفت انگیز", "جشنواره شگفت‌انگیز", "جشنواره");
+        var food = HasAny(text, "نوشیدنی", "خوراکی", "نوشیدنی سرد", "نوشیدنی گرم");
+        var promotional = HasAny(text,
+            "کالای تبلیغاتی", "محصول تبلیغاتی", "محتوای آموزشی", "محتوی آموزشی", "نشان و جوایز", "تجهیزات جانبی",
+            "پوشاک", "لباس", "جوراب", "شال", "پیراهن", "تی شرت", "کتاب", "مجله", "بروشور", "کاتالوگ", "دفترچه فاکتور", "کلربوک");
+        var other = HasAny(text, "محصولات دیگر", "محصول دیگر", "سایر محصولات");
+        var personalCare = HasAny(text,
+            "بهداشتی و مراقبتی", "مراقبت دست و صورت", "مراقبت دست و ناخن", "مراقبت دهان و دندان", "مراقبت پا",
+            "مسواک", "خمیر دندان", "نخ دندان", "ضد ترک پا", "مراقبت بدن", "شامپو بدن");
         var hair = HasAny(text, "مو", "موی", "موهام", "موها", "شامپو", "نرم کننده", "کراتین", "روغن مو", "سرم مو", "ماسک مو", "موس مو");
         var beauty = HasAny(
             text,
-            "رژ", "ریمل", "کانسیلر", "سایه", "خط چشم", "کرم پودر", "لاک", "رژگونه", "برنزر", "برانزر",
+            "آرایش", "آرایشی", "زیبایی", "رژ", "ریمل", "کانسیلر", "سایه", "خط چشم", "کرم پودر", "لاک", "رژگونه", "برنزر", "برانزر",
             "برق لب", "لیپ گلاس", "بی بی کرم", "پرایمر", "پنکیک", "مداد ابرو", "هایلایتر", "آی لاینر", "فاندیشن");
         var skin = HasAny(
             text,
@@ -347,11 +367,28 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
             hair = false;
         }
 
-        return (hair, beauty, skin) switch
+        // A specific catalog class takes precedence over a generic word such as
+        // "آرایش" inside "پد آرایش پاک‌کن" or "بهداشتی" inside "نوار بهداشتی".
+        if (cellulose || food || bundles || campaigns || other || personalCare || promotional)
         {
-            (true, false, false) => "hair",
-            (false, true, false) => "beauty",
-            (false, false, true) => "skin",
+            beauty = false;
+            skin = false;
+            hair = false;
+        }
+
+        return (fragrance, cellulose, food, bundles, campaigns, other, personalCare, promotional, hair, beauty, skin) switch
+        {
+            (true, false, false, false, false, false, false, false, false, false, false) => "fragrance",
+            (false, true, false, false, false, false, false, false, false, false, false) => "cellulose",
+            (false, false, true, false, false, false, false, false, false, false, false) => "food",
+            (false, false, false, true, false, false, false, false, false, false, false) => "bundles",
+            (false, false, false, false, true, false, false, false, false, false, false) => "campaigns",
+            (false, false, false, false, false, true, false, false, false, false, false) => "other",
+            (false, false, false, false, false, false, true, false, false, false, false) => "personal-care",
+            (false, false, false, false, false, false, false, true, false, false, false) => "promotional",
+            (false, false, false, false, false, false, false, false, true, false, false) => "hair",
+            (false, false, false, false, false, false, false, false, false, true, false) => "beauty",
+            (false, false, false, false, false, false, false, false, false, false, true) => "skin",
             _ => null
         };
     }
@@ -448,8 +485,34 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         };
     }
 
+    private static string? ResolveDomain(string message, IEnumerable<Category> categories)
+    {
+        var text = PersianText.Normalize(message);
+        var all = categories.ToArray();
+        var heuristicDomain = ScopeDomain(text);
+        var exact = all.Where(x => HasAny(text, PersianText.Normalize(x.Name))
+                || HasAny(text, PersianText.Normalize(x.Slug.Replace('-', ' '))))
+            .DistinctBy(x => x.Slug)
+            .ToArray();
+        if (exact.Length > 0)
+        {
+            var maximumSpecificity = exact.Max(x => PersianText.SearchTokens(x.Name).Count());
+            var mostSpecific = exact.Where(x => PersianText.SearchTokens(x.Name).Count() == maximumSpecificity).ToArray();
+            if (mostSpecific.Length == 1
+                && (heuristicDomain is null
+                    || mostSpecific[0].Domain == heuristicDomain
+                    || maximumSpecificity >= 2))
+            {
+                return mostSpecific[0].Domain;
+            }
+        }
+
+        return heuristicDomain ?? MatchUniqueCategory(text, all, null)?.Domain;
+    }
+
     private static bool HasRuleFilters(QueryModelOutput parsed, ParsedSize? size) =>
-        parsed.CategorySlug is not null
+        parsed.Domain is not null
+        || parsed.CategorySlug is not null
         || parsed.BrandSlug is not null
         || parsed.SkinType is not null
         || parsed.HairType is not null
@@ -529,6 +592,33 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         }
 
         return false;
+    }
+
+    private static QueryModelOutput ConstrainToDomain(
+        QueryModelOutput parsed,
+        string domain,
+        string? matchedCategorySlug,
+        IEnumerable<Category> categories)
+    {
+        var categorySlug = matchedCategorySlug
+            ?? (parsed.CategorySlug is not null && CategoryBelongsToDomain(parsed.CategorySlug, domain, categories)
+                ? parsed.CategorySlug
+                : null);
+        return new()
+        {
+            Query = parsed.Query,
+            Domain = domain,
+            CategorySlug = categorySlug,
+            BrandSlug = parsed.BrandSlug,
+            SkinType = domain == "skin" ? parsed.SkinType : null,
+            HairType = domain == "hair" ? parsed.HairType : null,
+            Shade = domain == "beauty" ? parsed.Shade : null,
+            Finish = domain == "beauty" ? parsed.Finish : null,
+            ConcernSlugs = parsed.ConcernSlugs,
+            ExcludeIngredientSlugs = parsed.ExcludeIngredientSlugs,
+            FragranceFree = parsed.FragranceFree,
+            PricePreference = parsed.PricePreference
+        };
     }
 
     private static Brand? MatchUniqueBrand(string text, IEnumerable<Brand> brands)
@@ -621,11 +711,11 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         // This narrows the vocabulary only; an inferred scope is not a hard SQL filter.
         var customerLanguageTerms = CustomerLanguageQuery.ExpandTerms(message);
         var scopeText = $"{message} {previous} {customerLanguageTerms}";
-        var scope = request.Domain ?? ScopeDomain(scopeText);
+        var scope = request.Domain ?? ResolveDomain(scopeText, vocabulary.Categories);
         var searchText = PersianText.Normalize(scopeText);
         var scoped = vocabulary with
         {
-            Categories = vocabulary.Categories.Where(x => scope is null || x.Domain == scope).Select(x => new
+            Categories = vocabulary.Categories.Where(x => scope is null || CategoryBelongsToDomain(x.Slug, scope, vocabulary.Categories)).Select(x => new
             {
                 Value = x,
                 Score = LabelScore(searchText, x.Name)
