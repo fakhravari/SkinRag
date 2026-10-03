@@ -87,7 +87,11 @@ public sealed class CatalogQueryService(IDbContextFactory<SkinRagDbContext> dbFa
         CatalogFilters filters,
         CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(filters.Domain) && string.IsNullOrWhiteSpace(filters.CategorySlug))
+        var domains = filters.Domains.Append(filters.Domain).Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var categorySlugs = filters.CategorySlugs.Append(filters.CategorySlug)
+            .Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (domains.Length == 0 && categorySlugs.Length == 0)
         {
             return null;
         }
@@ -109,31 +113,33 @@ public sealed class CatalogQueryService(IDbContextFactory<SkinRagDbContext> dbFa
             return included.ToArray();
         }
 
-        var domainIds = string.IsNullOrWhiteSpace(filters.Domain)
+        var domainIds = domains.Length == 0
             ? null
-            : categories.Where(x => x.Domain == filters.Domain).Select(x => x.Id).ToArray();
+            : categories.Where(x => domains.Contains(x.Domain, StringComparer.OrdinalIgnoreCase)).Select(x => x.Id).ToArray();
         int[]? categoryIds = null;
-        if (!string.IsNullOrWhiteSpace(filters.CategorySlug))
+        foreach (var categorySlug in categorySlugs)
         {
-            var selectedCategory = categories.FirstOrDefault(x => x.Slug == filters.CategorySlug);
-            categoryIds = selectedCategory is null ? [] : Expand([selectedCategory.Id]);
+            var selectedCategory = categories.FirstOrDefault(x => x.Slug == categorySlug);
+            var selectedIds = selectedCategory is null ? [] : Expand([selectedCategory.Id]);
 
             // Some imported top-level categories are siblings of the normalized
             // taxonomy instead of parents. A category whose slug is its domain
             // still means the whole domain (for example, category "hair").
             if (selectedCategory is not null && selectedCategory.Slug == selectedCategory.Domain)
             {
-                categoryIds = domainIds ?? categories.Where(x => x.Domain == selectedCategory.Domain).Select(x => x.Id)
-                    .ToArray();
+                selectedIds = categories.Where(x => x.Domain == selectedCategory.Domain).Select(x => x.Id).ToArray();
             }
             // In the imported tree, some child categories kept their source
             // hierarchy while their products were assigned a normalized domain.
             // Keep the selected category subtree available when its own domain
             // matches the selected domain.
-            else if (selectedCategory is not null && selectedCategory.Domain == filters.Domain && domainIds is not null)
+            else if (selectedCategory is not null && domains.Contains(selectedCategory.Domain, StringComparer.OrdinalIgnoreCase)
+                     && domainIds is not null)
             {
-                domainIds = domainIds.Concat(categoryIds).Distinct().ToArray();
+                domainIds = domainIds.Concat(selectedIds).Distinct().ToArray();
             }
+
+            categoryIds = categoryIds is null ? selectedIds : categoryIds.Concat(selectedIds).Distinct().ToArray();
         }
 
         return new CategoryScope(domainIds, categoryIds);
@@ -157,49 +163,59 @@ public sealed class CatalogQueryService(IDbContextFactory<SkinRagDbContext> dbFa
         CategoryScope? scope = null)
     {
         query = query.Where(p => p.IsActive);
-        if (!string.IsNullOrWhiteSpace(f.Domain))
+        var domains = f.Domains.Append(f.Domain).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToArray();
+        var categorySlugs = f.CategorySlugs.Append(f.CategorySlug).Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct().ToArray();
+        var brandSlugs = f.BrandSlugs.Append(f.BrandSlug).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToArray();
+        var skinTypes = f.SkinTypes.Append(f.SkinType).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToArray();
+        var hairTypes = f.HairTypes.Append(f.HairType).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToArray();
+        var concernSlugs = f.ConcernSlugs.Append(f.ConcernSlug).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToArray();
+        var shades = f.Shades.Append(f.Shade).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToArray();
+        var finishes = f.Finishes.Append(f.Finish).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToArray();
+        if (domains.Length > 0)
         {
             query = scope?.DomainCategoryIds is { } domainCategoryIds
                 ? query.Where(p => domainCategoryIds.Contains(p.CategoryId))
-                : query.Where(p => p.CategoryDetails != null && p.CategoryDetails.Domain == f.Domain);
+                : query.Where(p => p.CategoryDetails != null && domains.Contains(p.CategoryDetails.Domain));
         }
 
-        if (!string.IsNullOrWhiteSpace(f.CategorySlug))
+        if (categorySlugs.Length > 0)
         {
             query = scope?.CategoryCategoryIds is { } categoryCategoryIds
                 ? query.Where(p => categoryCategoryIds.Contains(p.CategoryId))
                 : query.Where(p => p.CategoryDetails != null
-                                   && (p.CategoryDetails.Slug == f.CategorySlug
-                                       || (p.CategoryDetails.Parent != null &&
-                                           p.CategoryDetails.Parent.Slug == f.CategorySlug)));
+                                   && (categorySlugs.Contains(p.CategoryDetails.Slug)
+                                       || (p.CategoryDetails.Parent != null && categorySlugs.Contains(p.CategoryDetails.Parent.Slug))));
         }
 
-        if (!string.IsNullOrWhiteSpace(f.BrandSlug))
+        if (brandSlugs.Length > 0)
         {
-            query = query.Where(p => p.BrandDetails != null && p.BrandDetails.Slug == f.BrandSlug);
+            query = query.Where(p => p.BrandDetails != null && brandSlugs.Contains(p.BrandDetails.Slug));
         }
 
-        if (!string.IsNullOrWhiteSpace(f.SkinType))
+        if (skinTypes.Length > 0)
         {
             query = query.Where(p => p.ProductProfiles.Any(x => x.Profile.Kind == "skin"
-                                                                && (x.Profile.Slug == f.SkinType ||
-                                                                    x.Profile.Name == f.SkinType ||
+                                                                && (skinTypes.Contains(x.Profile.Slug) ||
+                                                                    (x.Profile.Name != null && skinTypes.Contains(x.Profile.Name)) ||
                                                                     x.Profile.Slug == "skin-all"))
-                                     || (!p.ProductProfiles.Any() && p.SkinTypes.Contains(f.SkinType)));
+                                     || (!p.ProductProfiles.Any() && skinTypes.Any(skinType =>
+                                         p.SkinTypes.Contains(skinType))));
         }
 
-        if (!string.IsNullOrWhiteSpace(f.HairType))
+        if (hairTypes.Length > 0)
         {
             query = query.Where(p => p.ProductProfiles.Any(x => x.Profile.Kind == "hair"
-                                                                && (x.Profile.Slug == f.HairType ||
-                                                                    x.Profile.Name == f.HairType ||
+                                                                && (hairTypes.Contains(x.Profile.Slug) ||
+                                                                    (x.Profile.Name != null && hairTypes.Contains(x.Profile.Name)) ||
                                                                     x.Profile.Slug == "hair-all"))
-                                     || (!p.ProductProfiles.Any() && p.HairTypes.Contains(f.HairType)));
+                                     || (!p.ProductProfiles.Any() && hairTypes.Any(hairType =>
+                                         p.HairTypes.Contains(hairType))));
         }
 
-        if (!string.IsNullOrWhiteSpace(f.ConcernSlug))
+        if (concernSlugs.Length > 0)
         {
-            query = query.Where(p => p.ProductConcerns.Any(x => x.Concern.Slug == f.ConcernSlug));
+            query = query.Where(p => p.ProductConcerns.Any(x => concernSlugs.Contains(x.Concern.Slug)));
         }
 
         if (f.FragranceFree.HasValue)
@@ -219,26 +235,28 @@ public sealed class CatalogQueryService(IDbContextFactory<SkinRagDbContext> dbFa
         return query.Where(p => p.Variants.Any(v => v.IsActive && (!inStockOnly || v.StockQuantity > 0)
                                                                && (!f.MinPrice.HasValue || v.Price >= f.MinPrice)
                                                                && (!f.MaxPrice.HasValue || v.Price <= f.MaxPrice)
-                                                               && (f.Shade == null || v.Shade == f.Shade)
-                                                               && (f.Finish == null || v.Finish == f.Finish)
+                                                               && (shades.Length == 0 || (v.Shade != null && shades.Contains(v.Shade)))
+                                                               && (finishes.Length == 0 || (v.Finish != null && finishes.Contains(v.Finish)))
                                                                && (!f.SizeValue.HasValue || v.SizeValue == f.SizeValue)
                                                                && (f.SizeUnit == null || v.SizeUnit == f.SizeUnit))
                                 || (!p.Variants.Any() && (!inStockOnly || p.StockQuantity > 0)
                                                       && (!f.MinPrice.HasValue || p.Price >= f.MinPrice)
                                                       && (!f.MaxPrice.HasValue || p.Price <= f.MaxPrice)
-                                                      && f.Shade == null
-                                                      && f.Finish == null
+                                                      && shades.Length == 0
+                                                      && finishes.Length == 0
                                                       && !f.SizeValue.HasValue
                                                       && f.SizeUnit == null));
     }
 
     public static IReadOnlyList<VariantDto> EligibleVariants(Product p, CatalogFilters f, bool inStockOnly = true)
     {
+        var shades = f.Shades.Append(f.Shade).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+        var finishes = f.Finishes.Append(f.Finish).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
         return p.Variants.Where(v => v.IsActive && (!inStockOnly || v.StockQuantity > 0)
                                                 && (!f.MinPrice.HasValue || v.Price >= f.MinPrice)
                                                 && (!f.MaxPrice.HasValue || v.Price <= f.MaxPrice)
-                                                && (f.Shade == null || v.Shade == f.Shade)
-                                                && (f.Finish == null || v.Finish == f.Finish)
+                                                && (shades.Length == 0 || (v.Shade != null && shades.Contains(v.Shade)))
+                                                && (finishes.Length == 0 || (v.Finish != null && finishes.Contains(v.Finish)))
                                                 && (!f.SizeValue.HasValue || v.SizeValue == f.SizeValue)
                                                 && (f.SizeUnit == null || v.SizeUnit == f.SizeUnit))
             .OrderBy(v => v.Price)
@@ -282,29 +300,32 @@ public sealed class CatalogQueryService(IDbContextFactory<SkinRagDbContext> dbFa
 
     public static async Task ValidateFiltersAsync(SkinRagDbContext db, CatalogFilters f, CancellationToken ct)
     {
-        if (f.CategorySlug != null && !await db.Categories.AnyAsync(x => x.Slug == f.CategorySlug, ct))
+        var categorySlugs = f.CategorySlugs.Append(f.CategorySlug).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+        if (categorySlugs.Length > 0 && await db.Categories.CountAsync(x => categorySlugs.Contains(x.Slug), ct) != categorySlugs.Distinct().Count())
         {
             throw new ArgumentException("دسته‌بندی ناشناخته است؛ فهرست معتبر در api/catalog/filters است.");
         }
 
-        if (f.BrandSlug != null && !await db.Brands.AnyAsync(x => x.Slug == f.BrandSlug, ct))
+        var brandSlugs = f.BrandSlugs.Append(f.BrandSlug).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+        if (brandSlugs.Length > 0 && await db.Brands.CountAsync(x => brandSlugs.Contains(x.Slug), ct) != brandSlugs.Distinct().Count())
         {
             throw new ArgumentException("برند ناشناخته است.");
         }
 
-        if (f.ConcernSlug != null && !await db.Concerns.AnyAsync(x => x.Slug == f.ConcernSlug, ct))
+        var concernSlugs = f.ConcernSlugs.Append(f.ConcernSlug).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+        if (concernSlugs.Length > 0 && await db.Concerns.CountAsync(x => concernSlugs.Contains(x.Slug), ct) != concernSlugs.Distinct().Count())
         {
             throw new ArgumentException("نیاز مراقبتی ناشناخته است.");
         }
 
-        if (f.SkinType != null
-            && !await db.Profiles.AnyAsync(x => x.Kind == "skin" && (x.Slug == f.SkinType || x.Name == f.SkinType), ct))
+        var skinTypes = f.SkinTypes.Append(f.SkinType).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+        if (skinTypes.Length > 0 && await db.Profiles.CountAsync(x => x.Kind == "skin" && skinTypes.Contains(x.Slug), ct) != skinTypes.Distinct().Count())
         {
             throw new ArgumentException("نوع پوست ناشناخته است؛ از نام یا slug پروفایل استفاده کنید.");
         }
 
-        if (f.HairType != null
-            && !await db.Profiles.AnyAsync(x => x.Kind == "hair" && (x.Slug == f.HairType || x.Name == f.HairType), ct))
+        var hairTypes = f.HairTypes.Append(f.HairType).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+        if (hairTypes.Length > 0 && await db.Profiles.CountAsync(x => x.Kind == "hair" && hairTypes.Contains(x.Slug), ct) != hairTypes.Distinct().Count())
         {
             throw new ArgumentException("نوع مو ناشناخته است؛ از نام یا slug پروفایل استفاده کنید.");
         }
@@ -318,5 +339,15 @@ public sealed class CatalogQueryService(IDbContextFactory<SkinRagDbContext> dbFa
                 throw new ArgumentException("یک یا چند ترکیب مستثنا ناشناخته است.");
             }
         }
+
+        var domains = f.Domains.Append(f.Domain).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+        if (domains.Length > 0 && await db.Categories.Select(x => x.Domain).Distinct().CountAsync(x => domains.Contains(x), ct) != domains.Distinct().Count())
+            throw new ArgumentException("حوزهٔ انتخابی ناشناخته است.");
+        var shades = f.Shades.Append(f.Shade).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+        if (shades.Length > 0 && await db.ProductVariants.Where(x => x.IsActive && shades.Contains(x.Shade!)).Select(x => x.Shade).Distinct().CountAsync(ct) != shades.Distinct().Count())
+            throw new ArgumentException("رنگ انتخابی ناشناخته است.");
+        var finishes = f.Finishes.Append(f.Finish).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+        if (finishes.Length > 0 && await db.ProductVariants.Where(x => x.IsActive && finishes.Contains(x.Finish!)).Select(x => x.Finish).Distinct().CountAsync(ct) != finishes.Distinct().Count())
+            throw new ArgumentException("جلوهٔ انتخابی ناشناخته است.");
     }
 }

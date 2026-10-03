@@ -83,8 +83,8 @@ public sealed class RecommendationValidator(IProductRepository repository)
                    || p.Variants.Any(v => v.StockQuantity > 0 && v.Price >= 0 &&
                                           (!filters.MaxPrice.HasValue || v.Price <= filters.MaxPrice)
                                           && (!filters.MinPrice.HasValue || v.Price >= filters.MinPrice)
-                                          && (filters.Shade is null || v.Shade == filters.Shade)
-                                          && (filters.Finish is null || v.Finish == filters.Finish)
+                                          && (filters.Shades.Append(filters.Shade).All(string.IsNullOrWhiteSpace) || (v.Shade != null && filters.Shades.Append(filters.Shade).Contains(v.Shade)))
+                                          && (filters.Finishes.Append(filters.Finish).All(string.IsNullOrWhiteSpace) || (v.Finish != null && filters.Finishes.Append(filters.Finish).Contains(v.Finish)))
                                           && (!filters.SizeValue.HasValue || v.SizeValue == filters.SizeValue)
                                           && (filters.SizeUnit is null || v.SizeUnit == filters.SizeUnit)));
     }

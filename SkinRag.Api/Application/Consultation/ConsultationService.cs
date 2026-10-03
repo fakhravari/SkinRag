@@ -374,7 +374,10 @@ public sealed class ConsultationService(
 
     private static bool HasCatalogSelection(ConsultationRequest request)
     {
-        return request.CategorySlug is not null
+        return request.Domains.Length > 0 || request.CategorySlugs.Length > 0 || request.BrandSlugs.Length > 0
+               || request.SkinTypes.Length > 0 || request.HairTypes.Length > 0 || request.ConcernSlugs.Length > 0
+               || request.Shades.Length > 0 || request.Finishes.Length > 0
+               || request.CategorySlug is not null
                || request.BrandSlug is not null
                || request.SkinType is not null
                || request.HairType is not null

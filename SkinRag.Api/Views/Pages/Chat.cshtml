@@ -51,7 +51,7 @@
                         <use href="/assets/icons.svg#layers"/>
                     </svg>حوزه کالا
                 </label>
-                <select id="domain">
+                <select id="domain" multiple>
                     <option value="">همه حوزه‌ها</option>
                 </select>
             </div>
@@ -61,7 +61,7 @@
                         <use href="/assets/icons.svg#package"/>
                     </svg>نوع محصول
                 </label>
-                <select id="category">
+                <select id="category" multiple>
                     <option value="">همه محصولات</option>
                 </select>
             </div>
@@ -71,7 +71,7 @@
                         <use href="/assets/icons.svg#droplet"/>
                     </svg>نوع پوست
                 </label>
-                <select id="skinType">
+                <select id="skinType" multiple>
                     <option value="">مشخص نشده</option>
                 </select>
             </div>
@@ -81,7 +81,7 @@
                         <use href="/assets/icons.svg#scissors"/>
                     </svg>نوع مو
                 </label>
-                <select id="hairType">
+                <select id="hairType" multiple>
                     <option value="">مشخص نشده</option>
                 </select>
             </div>
@@ -104,16 +104,13 @@
                 <span class="field-hint">قیمت‌ها به ریال هستند، نه تومان.</span>
             </div>
         </div>
-        <div class="separator"></div>
-        <details class="advanced-filters">
-            <summary>ترجیحات بیشتر</summary>
             <div class="field">
                 <label for="brand">
                     <svg class="icon" aria-hidden="true">
                         <use href="/assets/icons.svg#tag"/>
                     </svg>برند
                 </label>
-                <select id="brand">
+                <select id="brand" multiple>
                     <option value="">همه برندها</option>
                 </select>
             </div>
@@ -123,7 +120,7 @@
                         <use href="/assets/icons.svg#heart"/>
                     </svg>نیاز مراقبتی
                 </label>
-                <select id="concern">
+                <select id="concern" multiple>
                     <option value="">انتخاب نشده</option>
                 </select>
             </div>
@@ -133,7 +130,7 @@
                         <use href="/assets/icons.svg#palette"/>
                     </svg>رنگ
                 </label>
-                <select id="shade">
+                <select id="shade" multiple>
                     <option value="">همه رنگ‌ها</option>
                 </select>
             </div>
@@ -143,7 +140,7 @@
                         <use href="/assets/icons.svg#sparkles"/>
                     </svg>جلوه آرایش
                 </label>
-                <select id="finish">
+                <select id="finish" multiple>
                     <option value="">همه جلوه‌ها</option>
                 </select>
             </div>
@@ -171,7 +168,6 @@
                     برابر حساسیت نیست.
                 </span>
             </div>
-        </details>
         <button id="resetFilters" class="button secondary wide" type="button">
             <svg class="icon" aria-hidden="true">
                 <use href="/assets/icons.svg#refresh"/>

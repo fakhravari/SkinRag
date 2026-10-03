@@ -373,15 +373,23 @@ public sealed partial class QueryBuilder(
         return new CatalogFilters
         {
             Domain = f.Domain,
+            Domains = f.Domains.ToArray(),
             CategorySlug = f.CategorySlug,
+            CategorySlugs = f.CategorySlugs.ToArray(),
             BrandSlug = f.BrandSlug,
+            BrandSlugs = f.BrandSlugs.ToArray(),
             SkinType = f.SkinType,
+            SkinTypes = f.SkinTypes.ToArray(),
             HairType = f.HairType,
+            HairTypes = f.HairTypes.ToArray(),
             ConcernSlug = f.ConcernSlug,
+            ConcernSlugs = f.ConcernSlugs.ToArray(),
             MinPrice = f.MinPrice,
             MaxPrice = f.MaxPrice,
             Shade = f.Shade,
+            Shades = f.Shades.ToArray(),
             Finish = f.Finish,
+            Finishes = f.Finishes.ToArray(),
             SizeValue = f.SizeValue,
             SizeUnit = f.SizeUnit,
             FragranceFree = f.FragranceFree,
@@ -654,7 +662,10 @@ public sealed partial class QueryBuilder(
                || request.SizeValue.HasValue
                || request.SizeUnit is not null
                || request.FragranceFree.HasValue
-               || request.ExcludeIngredientSlugs.Length > 0;
+               || request.ExcludeIngredientSlugs.Length > 0
+               || request.Domains.Length > 0 || request.CategorySlugs.Length > 0 || request.BrandSlugs.Length > 0
+               || request.SkinTypes.Length > 0 || request.HairTypes.Length > 0 || request.ConcernSlugs.Length > 0
+               || request.Shades.Length > 0 || request.Finishes.Length > 0;
     }
 
     private static Category? MatchUniqueCategory(string text, IEnumerable<Category> categories, string? domain)

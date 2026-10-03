@@ -5,7 +5,7 @@
             ingredientNames = new Map(),
             profileNames = new Map(),
             concernNames = new Map(),
-            domain = null,
+            domains = [],
             history = [],
             conversationId = null,
             pendingRequest = null;
@@ -41,8 +41,9 @@
 
         function fillSelect(id, items, label, preserve) {
             var $select = $(id),
-                selected = preserve ? $select.val() : "";
-            $select.empty().append($("<option>").val("").text(label));
+                selected = preserve ? $select.val() : ($select.prop("multiple") ? [] : "");
+            $select.empty();
+            if (!$select.prop("multiple")) $select.append($("<option>").val("").text(label));
             items.forEach(function (item) {
                 $select.append(
                     $("<option>")
@@ -50,7 +51,7 @@
                         .text(item.name || item),
                 );
             });
-            if (selected) $select.val(selected);
+            if (selected && (!Array.isArray(selected) || selected.length)) $select.val(selected);
             syncCheckboxDropdown(id);
         }
 
@@ -76,7 +77,11 @@
                 optionLabels = selected.map(function (value) {
                     return $select.find("option").filter(function () { return this.value === value; }).text();
                 }).filter(Boolean);
-            $summary.text(optionLabels.length ? optionLabels.join("، ") : "انتخاب کنید");
+            if (optionLabels.length === 1) $summary.text(optionLabels[0]);
+            else if (optionLabels.length > 1) {
+                $summary.append($("<span>").text("مورد انتخاب شد"),
+                    $("<b>").addClass("check-dropdown-count").text(app.number(optionLabels.length)));
+            } else $summary.text("انتخاب کنید");
             var $options = $dropdown.find(".check-dropdown-options").empty();
             $select.find("option").each(function () {
                 var value = this.value,
@@ -93,24 +98,24 @@
             });
         }
 
-        function setDomain(value, preserve) {
-            domain = value || null;
-            $("#domain").val(domain || "");
+        function setDomain(values, preserve) {
+            domains = Array.isArray(values) ? values : (values ? [values] : []);
+            $("#domain").val(domains);
             $("#skinField, #hairField, #shadeField, #finishField").prop("hidden", false);
-            if (!preserve) $("#category, #concern, #skinType, #hairType, #shade, #finish").val("");
+            if (!preserve) $("#category, #concern, #skinType, #hairType, #shade, #finish").val([]);
             if (taxonomy) {
                 fillSelect(
                     "#category",
                     taxonomy.categories.filter(function (c) {
-                        return !domain || c.domain === domain;
+                        return domains.length === 0 || domains.includes(c.domain);
                     }),
-                    domain ? "همه محصولات " + app.domainNames[domain] : "همه محصولات",
+                    "همه محصولات",
                     preserve,
                 );
                 fillSelect(
                     "#concern",
                     taxonomy.concerns.filter(function (c) {
-                        return !domain || c.domain === domain;
+                        return domains.length === 0 || domains.includes(c.domain);
                     }),
                     "انتخاب نشده",
                     preserve,
@@ -125,8 +130,7 @@
             $("#excludedIngredients").val([]);
             $("#maxPrice").val("");
             $("#fragranceFree").prop("checked", false);
-            $(".advanced-filters").prop("open", false);
-            setDomain(null, false);
+            setDomain([], false);
             syncAllCheckboxDropdowns();
             if (collapsePanel) {
                 $(".filters-panel").removeClass("filters-open");
@@ -135,13 +139,16 @@
         }
 
         function updateSummary() {
-            var labels = domain ? [app.domainNames[domain]] : [];
-            if ($("#category").val()) labels.push($("#category option:selected").text());
+            var labels = (domains || []).map(function (d) { return app.domainNames[d] || d; });
             ["#skinType", "#hairType", "#brand", "#concern", "#shade", "#finish"].forEach(
                 function (id) {
-                    if ($(id).val()) labels.push($(id + " option:selected").text());
+                    var selected = $(id).val() || [];
+                    if (!Array.isArray(selected)) selected = selected ? [selected] : [];
+                    labels = labels.concat(selected.map(function (v) { return $(id + " option").filter(function () { return this.value === v; }).text(); }).filter(Boolean));
                 },
             );
+            var categories = $("#category").val() || [];
+            if (categories.length) labels.push(app.number(categories.length) + " نوع محصول");
             var budget = $("#maxPrice").val();
             if (budget && Number.isFinite(Number(budget)))
                 labels.push("تا " + app.number(Number(budget)) + " ریال");
@@ -211,7 +218,7 @@
                     $("#excludedIngredients").val(selectedIngredients);
                     syncCheckboxDropdown("#excludedIngredients");
                     filtersReady = true;
-                    setDomain(domain, true);
+                    setDomain(domains, true);
                     checkStatus();
                 })
                 .fail(function (xhr) {
@@ -286,21 +293,15 @@
                 question: question,
                 history: history.slice(-4),
                 excludeIngredientSlugs: $("#excludedIngredients").val() || [],
+                domains: domains,
+                categorySlugs: $("#category").val() || [],
+                skinTypes: $("#skinType").val() || [],
+                hairTypes: $("#hairType").val() || [],
+                brandSlugs: $("#brand").val() || [],
+                concernSlugs: $("#concern").val() || [],
+                shades: $("#shade").val() || [],
+                finishes: $("#finish").val() || [],
             };
-            if (domain) request.domain = domain;
-            var fields = {
-                categorySlug: "#category",
-                brandSlug: "#brand",
-                concernSlug: "#concern",
-            };
-            fields.hairType = "#hairType";
-            fields.skinType = "#skinType";
-            fields.shade = "#shade";
-            fields.finish = "#finish";
-            Object.keys(fields).forEach(function (key) {
-                var value = $(fields[key]).val();
-                if (value) request[key] = value;
-            });
             if ($("#fragranceFree").prop("checked")) request.fragranceFree = true;
             var budget = $("#maxPrice").val();
             if (budget !== "") {
@@ -315,8 +316,9 @@
         function hasSelectedFilters(request) {
             return [
                 "domain", "categorySlug", "brandSlug", "concernSlug", "skinType", "hairType",
-                "minPrice", "maxPrice", "shade", "finish", "sizeValue", "sizeUnit", "fragranceFree",
+                "minPrice", "maxPrice", "sizeValue", "sizeUnit", "fragranceFree",
             ].some(function (key) { return request[key] !== undefined; })
+                || ["domains", "categorySlugs", "brandSlugs", "concernSlugs", "skinTypes", "hairTypes", "shades", "finishes"].some(function (key) { return request[key].length > 0; })
                 || request.excludeIngredientSlugs.length > 0;
         }
 
@@ -355,7 +357,9 @@
                 $("<div>")
                     .addClass("product-section-heading")
                     .append(
-                        $("<span>").text(app.number(response.products.length) + " محصول مرتبط"),
+                        $("<span>").addClass("result-count-badge")
+                            .append(app.icon("package"), $("<b>").text(app.number(response.products.length)),
+                                $("<span>").text("محصول مرتبط")),
                         $("<span>").text("قیمت و موجودی فعلی · ریال"),
                     ),
             );
@@ -367,8 +371,10 @@
                     .addClass("product-card-top")
                     .append(
                         $("<span>")
-                            .addClass("pill")
+                            .addClass("pill product-category-badge")
                             .text(p.category || app.domainNames[p.domain] || "محصول"),
+                        $("<span>").addClass("product-availability-badge")
+                            .append(app.icon("check"), $("<span>").text("موجود")),
                         $("<span>")
                             .addClass("product-id")
                             .text("#" + p.id),
@@ -450,32 +456,46 @@
                     $details.append($("<p>").text("روش استفاده: " + p.usageInstructions));
                 if (p.warnings) $details.append($("<p>").addClass("product-warning").text("هشدار: " + p.warnings));
                 var hasDetails = $details.children().length > 1;
-                var facts = [];
+                var facts = [],
+                    factKeys = new Set();
+                function addFact(fact) {
+                    var key = fact.text
+                        .normalize("NFKC")
+                        .replace(/[يى]/g, "ی")
+                        .replace(/ك/g, "ک")
+                        .replace(/[\s\u200c]+/g, " ")
+                        .trim()
+                        .toLowerCase();
+                    if (!key || factKeys.has(key)) return false;
+                    factKeys.add(key);
+                    facts.push(fact);
+                    return true;
+                }
                 if (p.fragranceFree !== null && p.fragranceFree !== undefined) {
-                    facts.push({
+                    addFact({
                         text: p.fragranceFree ? "بدون عطر افزوده" : "دارای عطر افزوده",
                         className: p.fragranceFree ? "fragrance-free" : "fragrance-added",
                     });
                 }
                 var profileFactCount = 0,
                     concernFactCount = 0;
-                (p.profiles || []).slice(0, 2).forEach(function (slug) {
-                    if (profileNames.has(slug)) {
-                        facts.push({ text: profileNames.get(slug) });
-                        profileFactCount++;
+                (p.profiles || []).forEach(function (slug) {
+                    if (profileFactCount < 2 && profileNames.has(slug)
+                        && addFact({ text: profileNames.get(slug) })) {
+                        profileFactCount += 1;
                     }
                 });
-                (p.concerns || []).slice(0, 3).forEach(function (slug) {
-                    if (concernNames.has(slug)) {
-                        facts.push({ text: concernNames.get(slug) });
-                        concernFactCount++;
+                (p.concerns || []).forEach(function (slug) {
+                    if (concernFactCount < 3 && concernNames.has(slug)
+                        && addFact({ text: concernNames.get(slug) })) {
+                        concernFactCount += 1;
                     }
                 });
                 if (!profileFactCount) {
-                    if (p.skinTypes) facts.push({ text: p.skinTypes });
-                    if (p.hairTypes) facts.push({ text: p.hairTypes });
+                    if (p.skinTypes) addFact({ text: p.skinTypes });
+                    if (p.hairTypes) addFact({ text: p.hairTypes });
                 }
-                if (!concernFactCount && p.concernsText) facts.push({ text: p.concernsText });
+                if (!concernFactCount && p.concernsText) addFact({ text: p.concernsText });
                 if (facts.length)
                     $card.append(
                         $("<div>")
@@ -672,7 +692,7 @@
             $conversation.scrollTop(0);
         });
         $("#domain").on("change", function () {
-            setDomain($(this).val(), false);
+            setDomain($(this).val() || [], false);
         });
         $("#toggleFilters").on("click", function () {
             var expanded = $(this).attr("aria-expanded") !== "true";

@@ -8,11 +8,18 @@ public class CatalogFilters : IValidatableObject
         "^(skin|hair|beauty|personal-care|fragrance|cellulose|promotional|food|other|bundles|campaigns)$")]
     public string? Domain { get; set; }
 
+    [MaxLength(20)] public string[] Domains { get; set; } = [];
+
     [MaxLength(80)] public string? CategorySlug { get; set; }
+    [MaxLength(20)] public string[] CategorySlugs { get; set; } = [];
     [MaxLength(80)] public string? BrandSlug { get; set; }
+    [MaxLength(20)] public string[] BrandSlugs { get; set; } = [];
     [MaxLength(100)] public string? SkinType { get; set; }
+    [MaxLength(20)] public string[] SkinTypes { get; set; } = [];
     [MaxLength(100)] public string? HairType { get; set; }
+    [MaxLength(20)] public string[] HairTypes { get; set; } = [];
     [MaxLength(80)] public string? ConcernSlug { get; set; }
+    [MaxLength(20)] public string[] ConcernSlugs { get; set; } = [];
 
     [Range(typeof(decimal), "0", "1000000000")]
     public decimal? MinPrice { get; set; }
@@ -21,7 +28,9 @@ public class CatalogFilters : IValidatableObject
     public decimal? MaxPrice { get; set; }
 
     [MaxLength(100)] public string? Shade { get; set; }
+    [MaxLength(20)] public string[] Shades { get; set; } = [];
     [MaxLength(100)] public string? Finish { get; set; }
+    [MaxLength(20)] public string[] Finishes { get; set; } = [];
 
     [Range(typeof(decimal), "0.01", "100000")]
     public decimal? SizeValue { get; set; }
@@ -43,6 +52,18 @@ public class CatalogFilters : IValidatableObject
         {
             yield return new ValidationResult("ترکیبات مستثنا باید با slug معتبر ارسال شوند.",
                 [nameof(ExcludeIngredientSlugs)]);
+        }
+
+        if (Domains is null || Domains.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 80)
+            || CategorySlugs is null || CategorySlugs.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 80)
+            || BrandSlugs is null || BrandSlugs.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 80)
+            || SkinTypes is null || SkinTypes.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 100)
+            || HairTypes is null || HairTypes.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 100)
+            || ConcernSlugs is null || ConcernSlugs.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 80)
+            || Shades is null || Shades.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 100)
+            || Finishes is null || Finishes.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 100))
+        {
+            yield return new ValidationResult("یکی از گزینه‌های انتخابی فیلتر معتبر نیست.");
         }
     }
 }

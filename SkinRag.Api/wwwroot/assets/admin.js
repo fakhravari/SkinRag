@@ -12,11 +12,15 @@
 
         function eventLog(text) {
             $("#eventLog .empty-log").remove();
+            var timestamp = new Date();
             $("<div>")
                 .addClass("event")
                 .append(
                     $("<span>").addClass("dot"),
-                    $("<div>").append($("<p>").text(text), $("<time>").text(app.time())),
+                    $("<div>").append(
+                        $("<p>").text(text),
+                        $("<time>").attr("datetime", timestamp.toISOString()).text(app.date(timestamp)),
+                    ),
                 )
                 .prependTo("#eventLog");
             $("#eventLog .event").slice(20).remove();
@@ -104,7 +108,7 @@
             $("#indexError")
                 .text(status.lastError || "")
                 .prop("hidden", !status.lastError);
-            $("#lastChecked").text("آخرین بررسی: " + app.time());
+            $("#lastChecked").text("آخرین بررسی: " + app.date(new Date()));
             if (previousState !== state) {
                 eventLog(
                     title +
@@ -138,13 +142,14 @@
                 });
             app.request("/health/ready")
                 .done(function (health) {
-                    $("#databaseStatus").text(health.databaseReady ? "متصل" : "در دسترس نیست");
+                    app.badge($("#databaseStatus"), health.databaseReady ? "متصل" : "در دسترس نیست",
+                        health.databaseReady ? "good" : "bad");
                 })
                 .fail(function (xhr) {
                     var health = xhr.responseJSON;
-                    $("#databaseStatus").text(
-                        health && health.databaseReady ? "متصل" : "در دسترس نیست",
-                    );
+                    var isReady = !!(health && health.databaseReady);
+                    app.badge($("#databaseStatus"), isReady ? "متصل" : "در دسترس نیست",
+                        isReady ? "good" : "bad");
                 });
         }
 
