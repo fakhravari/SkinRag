@@ -20,7 +20,18 @@ public static class WebApplicationExtensions
             app.UseHttpsRedirection();
         }
 
-        app.UseStaticFiles();
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            OnPrepareResponse = context =>
+            {
+                var extension = Path.GetExtension(context.File.Name);
+                if (extension.Equals(".css", StringComparison.OrdinalIgnoreCase)
+                    || extension.Equals(".js", StringComparison.OrdinalIgnoreCase))
+                {
+                    context.Context.Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
+                }
+            }
+        });
         app.UseRouting();
         app.UseAuthorization();
         return app;
