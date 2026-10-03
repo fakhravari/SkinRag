@@ -118,7 +118,8 @@ public sealed class ConsultationService(
             more,
             followUp,
             [],
-            intent.ConversationTopic?.ToString());
+            intent.ConversationTopic?.ToString(),
+            intent.Clarification?.ToString());
         if (!intent.IsRelevant)
         {
             if (intent.Intent is ConsultationIntent.Greeting or ConsultationIntent.SmallTalk)

@@ -6,6 +6,7 @@ using SkinRag.Api.Application.Parsing;
 using SkinRag.Api.Application.Retrieval;
 using SkinRag.Api.Application.Validation;
 using SkinRag.Api.Models;
+using SkinRag.Api.Services.Telemetry;
 
 internal static class BudgetChecks
 {
@@ -137,8 +138,9 @@ internal static class BudgetChecks
         check(missing.NeedsMoreInformation && missing.FollowUpQuestion!.Contains("ریال یا تومان"),
             "Missing currency did not ask for clarification");
 
+        using var performanceQueue = new ConsultationPerformanceQueue(null!, NullLogger<ConsultationPerformanceQueue>.Instance);
         var service = new ConsultationService(new InputGuard(), classifier, builder, repository, null!, null!, null!,
-            store, configuration, NullLogger<ConsultationService>.Instance);
+            store, performanceQueue, configuration, NullLogger<ConsultationService>.Instance);
         var first = await service.AskAsync(new ConsultationRequest { Question = budgetOnly }, default);
         check(first.NeedsMoreInformation && first.Answer.Contains("2,000,000 ریال")
             && first.Products.Count == 0 && first.ConversationId.HasValue,

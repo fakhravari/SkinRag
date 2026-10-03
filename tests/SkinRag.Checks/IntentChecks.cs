@@ -8,6 +8,7 @@ using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Application.Validation;
 using SkinRag.Api.Infrastructure.Ollama;
 using SkinRag.Api.Services;
+using SkinRag.Api.Services.Telemetry;
 
 internal static class IntentChecks
 {
@@ -17,9 +18,10 @@ internal static class IntentChecks
         var ai = new ProbeOllama();
         var classifier = new IntentClassifier(ai, config, NullLogger<IntentClassifier>.Instance);
         using var store = new ConversationStore();
+        using var performanceQueue = new ConsultationPerformanceQueue(null!, NullLogger<ConsultationPerformanceQueue>.Instance);
         // Dependencies are unavailable: a social response or clarification must return before retrieval.
         var service = new ConsultationService(new InputGuard(), classifier, null!, null!, null!, null!, null!,
-            store, config, NullLogger<ConsultationService>.Instance);
+            store, performanceQueue, config, NullLogger<ConsultationService>.Instance);
 
         foreach (var (question, topic) in new[]
         {

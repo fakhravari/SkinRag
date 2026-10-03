@@ -209,6 +209,14 @@ public sealed partial class QueryBuilder(IOllamaClient ollama, IConfiguration co
         concerns = concerns.Where(s => vocabulary.Concerns.Any(c => c.Slug == s && (filters.Domain is null || c.Domain == filters.Domain)))
             .Distinct()
             .ToArray();
+        // Matte/glow is already an exact variant-level finish filter. Requiring the
+        // corresponding product-level concern as well incorrectly excludes variants
+        // whose products are tagged with lip-color but not matte-look/glow-look.
+        if (request.ConcernSlug is null && filters.Domain == "beauty" && filters.Finish is not null)
+        {
+            concerns = concerns.Where(s => s is not ("matte-look" or "glow-look")).ToArray();
+        }
+
         // Relative requests seek alternatives, rather than being pinned to the earlier product IDs.
         var budget = parsed.PricePreference == "budget" || IsBudgetRequest(text);
         return CheckBudgetBounds(new(

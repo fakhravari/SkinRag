@@ -12,6 +12,7 @@ using SkinRag.Api.Infrastructure.Ollama;
 using SkinRag.Api.Infrastructure.Persistence;
 using SkinRag.Api.Models;
 using SkinRag.Api.Services;
+using SkinRag.Api.Services.Telemetry;
 
 var checks = 0;
 void Check(bool condition, string message)
@@ -50,6 +51,7 @@ var config = new ConfigurationBuilder().Build();
 var ai = new ProbeOllama();
 using var conversationStore = new ConversationStore();
 var classifier = new IntentClassifier(ai, config, NullLogger<IntentClassifier>.Instance);
+using var performanceQueue = new ConsultationPerformanceQueue(null!, NullLogger<ConsultationPerformanceQueue>.Instance);
 var service = new ConsultationService(
     new InputGuard(),
     classifier,
@@ -59,6 +61,7 @@ var service = new ConsultationService(
     null!,
     null!,
     conversationStore,
+    performanceQueue,
     config,
     NullLogger<ConsultationService>.Instance);
 var stopwatch = Stopwatch.StartNew();
@@ -324,6 +327,7 @@ var fullRetriever = new ProbeRetriever
 {
     Result = new(context, 1, DateTime.UtcNow, "hybrid-vector-lexical")
 };
+using var fullPerformanceQueue = new ConsultationPerformanceQueue(null!, NullLogger<ConsultationPerformanceQueue>.Instance);
 var full = new ConsultationService(
     guard,
     new IntentClassifier(fullAi, config, NullLogger<IntentClassifier>.Instance),
@@ -333,6 +337,7 @@ var full = new ConsultationService(
     fullAi,
     new RecommendationValidator(fullRepo),
     fullStore,
+    fullPerformanceQueue,
     config,
     NullLogger<ConsultationService>.Instance);
 fullAi.Intent = new()
@@ -394,7 +399,7 @@ Check(
     && fullReply.Recommendations?.Single().ProductId == 12,
     "Complete pipeline failed");
 Check(
-    fullReply.Answer.Contains("1,000,000 ریال") && fullReply.ConversationId.HasValue,
+    fullReply.Products.Single().Product.Price == 1_000_000m && fullReply.ConversationId.HasValue,
     "Authoritative price/conversation ID missing");
 fullAi.Intent = new()
 {
@@ -462,7 +467,8 @@ for (var i = 0; i < 3; i++)
 Check(ConversationStore.IsRepeated(repeatState, "کرم"), "Repeated-message guard failed");
 await IntentChecks.RunAsync(Check);
 await BudgetChecks.RunAsync(Check);
-Console.WriteLine($"{checks} checks passed. Social intent, routing, query contracts, JSON, live-stock/price validation, conversation and fallback verified.");
+await QueryRoutingChecks.RunAsync(Check);
+Console.WriteLine($"{checks} checks passed. Social intent, routing, query contracts, JSON, live-stock/price validation, conversation, fallback and catalog-domain routing verified.");
 if (args.Contains("--intent-live"))
 {
     var filterIndex = Array.IndexOf(args, "--intent-filter");
@@ -537,13 +543,12 @@ sealed class ProbeRepository : IProductRepository
         "IRR",
         5,
         false,
-        true,
         "خشک",
-        null,
+        "نامشخص",
         "کرم صورت",
         "برچسب را بررسی کنید",
         "طبق برچسب",
-        null,
+        "",
         ["skin-dry"],
         ["hydration"],
         ["glycerin"],
