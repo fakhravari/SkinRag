@@ -70,7 +70,9 @@ public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfigur
             {
                 model,
                 stream = false,
-                keep_alive = "30m",
+                keep_alive = configuration["Ollama:KeepAlive"]
+                    ?? Environment.GetEnvironmentVariable("OLLAMA_KEEP_ALIVE")
+                    ?? "30m",
                 format = schema,
                 messages = new[] {
                     new
@@ -109,11 +111,24 @@ public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfigur
         }
 
         logger.LogInformation(
-            "Ollama {Stage}: {Tokens} input tokens, {Seconds:F1}s, load {LoadSeconds:F1}s",
+            "Ollama {Stage}/{Model}: {PromptTokens} prompt tokens in {PromptSeconds:F1}s, {GeneratedTokens} generated tokens in {GenerationSeconds:F1}s, total {Seconds:F1}s, load {LoadSeconds:F1}s",
             options.Stage,
-            result.PromptTokens,
+            model,
+            result.PromptEvalCount,
+            result.PromptEvalDuration / 1e9,
+            result.EvalCount,
+            result.EvalDuration / 1e9,
             result.TotalDuration / 1e9,
             result.LoadDuration / 1e9);
+        ModelCallTelemetry.Record(new(
+            options.Stage,
+            model,
+            result.TotalDuration / 1e6,
+            result.LoadDuration / 1e6,
+            result.PromptEvalCount,
+            result.PromptEvalDuration / 1e6,
+            result.EvalCount,
+            result.EvalDuration / 1e6));
         return ParseStructured<T>(result.Message.Content);
     }
 
@@ -173,7 +188,16 @@ public sealed class OllamaClient(IHttpClientFactory httpClientFactory, IConfigur
         public long LoadDuration { get; set; }
 
         [JsonPropertyName("prompt_eval_count")]
-        public int PromptTokens { get; set; }
+        public int PromptEvalCount { get; set; }
+
+        [JsonPropertyName("prompt_eval_duration")]
+        public long PromptEvalDuration { get; set; }
+
+        [JsonPropertyName("eval_count")]
+        public int EvalCount { get; set; }
+
+        [JsonPropertyName("eval_duration")]
+        public long EvalDuration { get; set; }
     }
 
     private sealed class ChatMessage

@@ -129,6 +129,8 @@ dotnet run --project SkinRag.Api
 | `IntentMs` | مدت تشخیص نیت |
 | `CatalogReadMs` | مدت خواندن واژگان و گزینه‌های کاتالوگ |
 | `QueryBuildMs` | مدت ساخت برنامهٔ جست‌وجو، با احتساب استخراج مدل در صورت نیاز |
+| `SearchQuery` | عبارت نهایی جست‌وجو در کاتالوگ؛ با `Telemetry:LogSearchQuery=false` می‌توان ثبت آن را خاموش کرد |
+| `QuerySource` و `ModelCallsJson` | منشأ برنامهٔ جست‌وجو و جزئیات زمان‌بندی، بارگذاری و توکن‌های هر فراخوانی Ollama |
 | `SqlFilterMs` | مدت اجرای فیلتر SQL برای یافتن شناسه‌های واجد شرایط |
 | `EmbeddingMs` | مدت ساخت بردار پرس‌وجو با Ollama |
 | `ProductLoadMs` | مدت خواندن اطلاعات محصول از SQL |
@@ -150,6 +152,9 @@ SELECT TOP (100)
     IntentMs,
     CatalogReadMs,
     QueryBuildMs,
+    QuerySource,
+    SearchQuery,
+    ModelCallsJson,
     SqlFilterMs,
     EmbeddingMs,
     ProductLoadMs,

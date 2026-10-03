@@ -110,6 +110,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Intent).HasMaxLength(40);
             entity.Property(x => x.RetrievalMethod).HasMaxLength(60);
             entity.Property(x => x.ResponseMode).HasMaxLength(30);
+            entity.Property(x => x.QuerySource).HasMaxLength(500);
+            entity.Property(x => x.SearchQuery).HasColumnType("nvarchar(max)");
+            entity.Property(x => x.ModelCallsJson).HasColumnType("nvarchar(max)");
             entity.HasIndex(x => x.StartedAtLocal);
         });
     }

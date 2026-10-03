@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Diagnostics;
+using System.Text.Json;
 using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Application.Parsing;
@@ -26,6 +27,7 @@ public sealed class ConsultationService(
 {
     public async Task<ConsultationResponse> AskAsync(ConsultationRequest request, CancellationToken ct)
     {
+        using var modelCallScope = ModelCallTelemetry.Begin(out var modelCalls);
         var start = DateTime.Now;
         var timing = new ConsultationPerformanceLog
         {
@@ -50,6 +52,10 @@ public sealed class ConsultationService(
         }
         finally
         {
+            if (modelCalls.Count > 0)
+            {
+                timing.ModelCallsJson = JsonSerializer.Serialize(modelCalls);
+            }
             totalTimer.Stop();
             timing.CompletedAtLocal = DateTime.Now;
             timing.TotalMs = (long)totalTimer.Elapsed.TotalMilliseconds;
@@ -159,6 +165,11 @@ public sealed class ConsultationService(
 
         var vocabulary = await MeasureAsync(() => repository.VocabularyAsync(ct), elapsed => timing.CatalogReadMs = elapsed);
         var plan = await MeasureAsync(() => queryBuilder.BuildAsync(request, message, intent, state, vocabulary, ct), elapsed => timing.QueryBuildMs = elapsed);
+        timing.QuerySource = plan.Source;
+        if (configuration.GetValue("Telemetry:LogSearchQuery", true))
+        {
+            timing.SearchQuery = plan.Query;
+        }
         if (plan.NeedsMoreInformation)
         {
             return Direct(plan.FollowUpQuestion!, "clarification", true, plan.FollowUpQuestion);
@@ -233,20 +244,28 @@ public sealed class ConsultationService(
         ValidatedConsultation? validated = null;
         string mode = "model";
         string? notice = null;
-        try
+        var useGroundedFastPath = plan.Source == "persian-product-rule";
+        if (useGroundedFastPath)
         {
-            var generated = await MeasureAsync(() => GenerateAnswerAsync(message, intent, context, ct), elapsed => timing.AnswerGenerationMs = elapsed);
-            validated = await MeasureAsync(() => validator.ValidateAsync(generated, context, plan, ct), elapsed => timing.ValidationMs = elapsed);
+            mode = "catalog";
         }
-        catch (Exception ex) when (!ct.IsCancellationRequested && ex is (OperationCanceledException or HttpRequestException or InvalidModelOutputException))
+        else
         {
-            logger.LogWarning("Consultation generation unavailable ({ErrorType}); validating catalog fallback", ex.GetType().Name);
+            try
+            {
+                var generated = await MeasureAsync(() => GenerateAnswerAsync(message, intent, context, ct), elapsed => timing.AnswerGenerationMs = elapsed);
+                validated = await MeasureAsync(() => validator.ValidateAsync(generated, context, plan, ct), elapsed => timing.ValidationMs = elapsed);
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested && ex is (OperationCanceledException or HttpRequestException or InvalidModelOutputException))
+            {
+                logger.LogWarning("Consultation generation unavailable ({ErrorType}); validating catalog fallback", ex.GetType().Name);
+            }
         }
 
         if (validated is null)
         {
             mode = "catalog";
-            notice = "پاسخ مدل قابل استفاده نبود؛ نتیجه از اطلاعات فعلی کاتالوگ تهیه شد.";
+            notice = useGroundedFastPath ? null : "پاسخ مدل قابل استفاده نبود؛ نتیجه از اطلاعات فعلی کاتالوگ تهیه شد.";
             var fallback = new ConsultationResult
             {
                 Answer = GroundedAnswers.Answers[0],
