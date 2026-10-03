@@ -28,7 +28,10 @@ public sealed record RetrievalResult(
     IReadOnlyList<ProductMatch> Products,
     int EligibleProducts,
     DateTime? IndexUpdatedAtUtc,
-    string Method);
+    string Method,
+    double SqlFilterMs = 0,
+    double EmbeddingMs = 0,
+    double ProductLoadMs = 0);
 
 public interface IProductRetriever
 {

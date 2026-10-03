@@ -29,25 +29,13 @@ public sealed class CatalogController(CatalogService catalog, IDbContextFactory<
             currency = "IRR",
             priceUnit = "ریال",
             domains = new[] { "skin", "hair", "beauty" },
-            categories = await db.Categories.AsNoTracking().OrderBy(x => x.Id).Select(x => new
-            {
-                x.Id,
-                x.Slug,
-                x.Name,
-                x.Domain,
-                x.ParentId
-            })
-            .ToListAsync(ct),
+            categories = await db.Categories.AsNoTracking().OrderBy(x => x.Id).Select(x => new { x.Id, x.Slug, x.Name, x.Domain, x.ParentId }).ToListAsync(ct),
             brands = await db.Brands.AsNoTracking().OrderBy(x => x.Id).ToListAsync(ct),
             profiles = await db.Profiles.AsNoTracking().OrderBy(x => x.Id).ToListAsync(ct),
             concerns = await db.Concerns.AsNoTracking().OrderBy(x => x.Id).ToListAsync(ct),
             ingredients = await db.Ingredients.AsNoTracking().OrderBy(x => x.Id).ToListAsync(ct),
-            shades = await db.ProductVariants.Where(x => x.IsActive && x.Shade != null).Select(x => x.Shade).Distinct()
-            .OrderBy(x => x)
-            .ToListAsync(ct),
-            finishes = await db.ProductVariants.Where(x => x.IsActive && x.Finish != null).Select(x => x.Finish).Distinct()
-            .OrderBy(x => x)
-            .ToListAsync(ct)
+            shades = await db.ProductVariants.Where(x => x.IsActive && x.Shade != null).Select(x => x.Shade).Distinct().OrderBy(x => x).ToListAsync(ct),
+            finishes = await db.ProductVariants.Where(x => x.IsActive && x.Finish != null).Select(x => x.Finish).Distinct().OrderBy(x => x).ToListAsync(ct)
         });
     }
 
@@ -64,13 +52,7 @@ public sealed class CatalogController(CatalogService catalog, IDbContextFactory<
             variants = await db.ProductVariants.CountAsync(ct),
             categories = await db.Categories.CountAsync(ct),
             brands = await db.Brands.CountAsync(ct),
-            domains = await db.Products.Where(p => p.CategoryDetails != null).GroupBy(p => p.CategoryDetails!.Domain).Select(g => new
-            {
-                domain = g.Key,
-                products = g.Count(),
-                activeProducts = g.Count(p => p.IsActive)
-            })
-            .ToListAsync(ct)
+            domains = await db.Products.Where(p => p.CategoryDetails != null).GroupBy(p => p.CategoryDetails!.Domain).Select(g => new { domain = g.Key, products = g.Count(), activeProducts = g.Count(p => p.IsActive) }).ToListAsync(ct)
         });
     }
 }

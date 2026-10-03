@@ -12,6 +12,7 @@ using SkinRag.Api.Infrastructure.Ollama;
 using SkinRag.Api.Infrastructure.Persistence;
 using SkinRag.Api.Services.Catalog;
 using SkinRag.Api.Services.Knowledge;
+using SkinRag.Api.Services.Telemetry;
 
 namespace SkinRag.Api.Hosting;
 
@@ -72,6 +73,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IOllamaClient>(provider => provider.GetRequiredService<OllamaClient>());
         services.AddSingleton<KnowledgeIndexService>();
         services.AddHostedService<KnowledgeIndexWorker>();
+        services.AddSingleton<ConsultationPerformanceQueue>();
+        services.AddHostedService(provider => provider.GetRequiredService<ConsultationPerformanceQueue>());
     }
 
     private static void AddConsultationServices(IServiceCollection services)

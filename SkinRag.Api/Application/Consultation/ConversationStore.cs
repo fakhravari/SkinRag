@@ -59,21 +59,13 @@ public sealed class ConversationStore : IDisposable
 
     private void Store(ConversationState next)
     {
-        _cache.Set(
-            next.Id,
-            next,
-            new MemoryCacheEntryOptions
-            {
-                Size = 1,
-                SlidingExpiration = TimeSpan.FromMinutes(30)
-            });
+        _cache.Set(next.Id, next, new MemoryCacheEntryOptions { Size = 1, SlidingExpiration = TimeSpan.FromMinutes(30) });
     }
 
     public static bool IsRepeated(ConversationState state, string question)
     {
         var recent = state.RecentUserMessages.Length > 0 ? state.RecentUserMessages : state.UserQuestions;
-        return DateTime.UtcNow - state.UpdatedAtUtc < TimeSpan.FromSeconds(30)
-            && recent.Length >= 3 && recent.TakeLast(3).All(x => x == question);
+        return DateTime.UtcNow - state.UpdatedAtUtc < TimeSpan.FromSeconds(30) && recent.Length >= 3 && recent.TakeLast(3).All(x => x == question);
     }
     public void Dispose() => _cache.Dispose();
 }

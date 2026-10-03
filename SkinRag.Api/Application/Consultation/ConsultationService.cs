@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Diagnostics;
 using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Application.Parsing;
@@ -6,6 +7,7 @@ using SkinRag.Api.Application.Retrieval;
 using SkinRag.Api.Application.Validation;
 using SkinRag.Api.Models;
 using SkinRag.Api.Prompts;
+using SkinRag.Api.Services.Telemetry;
 
 namespace SkinRag.Api.Application.Consultation;
 
@@ -18,10 +20,40 @@ public sealed class ConsultationService(
     IOllamaClient ollama,
     RecommendationValidator validator,
     ConversationStore conversations,
+    ConsultationPerformanceQueue performanceQueue,
     IConfiguration configuration,
     ILogger<ConsultationService> logger)
 {
     public async Task<ConsultationResponse> AskAsync(ConsultationRequest request, CancellationToken ct)
+    {
+        var timing = new ConsultationPerformanceLog { StartedAtUtc = DateTime.UtcNow };
+        var totalTimer = Stopwatch.StartNew();
+        try
+        {
+            var response = await AskCoreAsync(request, ct, timing);
+            timing.Outcome = "success";
+            timing.Intent = response.Intent;
+            timing.RetrievalMethod = response.RetrievalMethod;
+            timing.ResponseMode = response.ResponseMode;
+            timing.ProductCount = response.Products.Count;
+            return response;
+        }
+        catch (Exception ex)
+        {
+            timing.Outcome = ex is OperationCanceledException ? "cancelled" : "error";
+            timing.ErrorType = ex.GetType().Name;
+            throw;
+        }
+        finally
+        {
+            totalTimer.Stop();
+            timing.CompletedAtUtc = DateTime.UtcNow;
+            timing.TotalMs = (long)totalTimer.Elapsed.TotalMilliseconds;
+            performanceQueue.Enqueue(timing);
+        }
+    }
+
+    private async Task<ConsultationResponse> AskCoreAsync(ConsultationRequest request, CancellationToken ct, ConsultationPerformanceLog timing)
     {
         if (request.EffectiveQuestion.Length > 2000)
         {
@@ -44,14 +76,14 @@ public sealed class ConsultationService(
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(TimeSpan.FromSeconds(configuration.GetValue("Consultation:TimeoutSeconds", 220)));
         ct = deadline.Token;
-        var clientMessages = request.History.Where(h => h.Role == "user")
-            .TakeLast(2).Select(h => InputNormalizer.Normalize(h.Content)).ToArray();
+        var clientMessages = request.History.Where(h => h.Role == "user").TakeLast(2).Select(h => InputNormalizer.Normalize(h.Content)).ToArray();
         var recentMessages = state.RecentUserMessages.Length > 0 ? state.RecentUserMessages : clientMessages;
-        var intentContext = new IntentContext(recentMessages, state.UserQuestions,
-            state.UserQuestions.Length > 0 || state.ProductIds.Length > 0);
-        var intent = request.FiltersOnly
-            ? new IntentDecision(ConsultationIntent.ProductSearch, 1, "filters-only")
-            : await classifier.ClassifyAsync(message, intentContext, ct);
+        var intentContext = new IntentContext(recentMessages, state.UserQuestions, state.UserQuestions.Length > 0 || state.ProductIds.Length > 0);
+        var intent = await MeasureAsync(
+            () => request.FiltersOnly
+                ? Task.FromResult(new IntentDecision(ConsultationIntent.ProductSearch, 1, "filters-only"))
+                : classifier.ClassifyAsync(message, intentContext, ct),
+            elapsed => timing.IntentMs = elapsed);
         if (intent.Intent == ConsultationIntent.Unclear
             && HasCatalogSelection(request)
             && IsRecommendationRequest(message))
@@ -59,7 +91,8 @@ public sealed class ConsultationService(
             intent = new(ConsultationIntent.ProductSearch, 1, "catalog-filter-rule");
         }
         logger.LogInformation("Intent {Intent} ({Source}), confidence {Confidence:F2}, topic {Topic}, requires context {RequiresContext}",
-            intent.Code, intent.Source, intent.Confidence, intent.ConversationTopic, intent.RequiresContext);
+                                    intent.Code, intent.Source, intent.Confidence, intent.ConversationTopic, intent.RequiresContext);
+        timing.Intent = intent.Code;
         ConsultationResponse Direct(string answer, string mode, bool more = false, string? followUp = null, string? notice = null) => new(
             answer,
             [],
@@ -82,16 +115,14 @@ public sealed class ConsultationService(
         {
             if (intent.Intent is ConsultationIntent.Greeting or ConsultationIntent.SmallTalk)
             {
-                var topic = intent.ConversationTopic ?? (intent.Intent == ConsultationIntent.Greeting
-                    ? ConversationTopic.Greeting : ConversationTopic.CasualChat);
+                var topic = intent.ConversationTopic ?? (intent.Intent == ConsultationIntent.Greeting ? ConversationTopic.Greeting : ConversationTopic.CasualChat);
                 conversations.SaveConversation(state, message);
                 return Direct(ConversationReplies.ReplyForTopic(topic), "conversation");
             }
 
             var clarification = ConversationReplies.ClarificationFor(intent.Clarification);
             var budget = BudgetParser.Parse(message);
-            var budgetNeedsProductClarification = intent.Clarification is
-                ClarificationKind.ProductType or ClarificationKind.BudgetCurrency or ClarificationKind.BudgetAmount;
+            var budgetNeedsProductClarification = intent.Clarification is ClarificationKind.ProductType or ClarificationKind.BudgetCurrency or ClarificationKind.BudgetAmount;
             if (budget.IsBudgetOnly && (budget.MaximumPriceRials.HasValue || request.MaxPrice.HasValue)
                 && intent.Intent == ConsultationIntent.Unclear && budgetNeedsProductClarification)
             {
@@ -122,14 +153,17 @@ public sealed class ConsultationService(
             };
         }
 
-        var vocabulary = await repository.VocabularyAsync(ct);
-        var plan = await queryBuilder.BuildAsync(request, message, intent, state, vocabulary, ct);
+        var vocabulary = await MeasureAsync(() => repository.VocabularyAsync(ct), elapsed => timing.CatalogReadMs = elapsed);
+        var plan = await MeasureAsync(() => queryBuilder.BuildAsync(request, message, intent, state, vocabulary, ct), elapsed => timing.QueryBuildMs = elapsed);
         if (plan.NeedsMoreInformation)
         {
             return Direct(plan.FollowUpQuestion!, "clarification", true, plan.FollowUpQuestion);
         }
 
         var retrieval = await retriever.RetrieveAsync(plan, ct);
+        timing.SqlFilterMs = retrieval.SqlFilterMs;
+        timing.EmbeddingMs = retrieval.EmbeddingMs;
+        timing.ProductLoadMs = retrieval.ProductLoadMs;
         ConsultationResponse Result(
             string answer,
             IReadOnlyList<ProductMatch> products,
@@ -171,10 +205,8 @@ public sealed class ConsultationService(
 
         if (intent.Intent is ConsultationIntent.PriceInquiry or ConsultationIntent.AvailabilityInquiry or ConsultationIntent.ProductDetails or ConsultationIntent.ProductComparison)
         {
-            var fresh = (await repository.LoadAsync(retrieval.Products.Select(x => x.Product.Id), plan, ct)).ToDictionary(p => p.Id);
-            var matches = retrieval.Products.Where(m => fresh.ContainsKey(m.Product.Id))
-                .Take(intent.Intent == ConsultationIntent.ProductComparison ? 2 : 5)
-                .Select(m => m with { Product = fresh[m.Product.Id] }).ToArray();
+            var fresh = (await MeasureAsync(() => repository.LoadAsync(retrieval.Products.Select(x => x.Product.Id), plan, ct), elapsed => timing.ProductLoadMs = (timing.ProductLoadMs ?? 0) + elapsed)).ToDictionary(p => p.Id);
+            var matches = retrieval.Products.Where(m => fresh.ContainsKey(m.Product.Id)).Take(intent.Intent == ConsultationIntent.ProductComparison ? 2 : 5).Select(m => m with { Product = fresh[m.Product.Id] }).ToArray();
             if (matches.Length == 0)
             {
                 return Result("اطلاعات یا موجودی محصول تغییر کرده است؛ دوباره جست‌وجو کنید.", [], "no-results");
@@ -199,8 +231,8 @@ public sealed class ConsultationService(
         string? notice = null;
         try
         {
-            var generated = await GenerateAnswerAsync(message, intent, context, ct);
-            validated = await validator.ValidateAsync(generated, context, plan, ct);
+            var generated = await MeasureAsync(() => GenerateAnswerAsync(message, intent, context, ct), elapsed => timing.AnswerGenerationMs = elapsed);
+            validated = await MeasureAsync(() => validator.ValidateAsync(generated, context, plan, ct), elapsed => timing.ValidationMs = elapsed);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested && ex is (OperationCanceledException or HttpRequestException or InvalidModelOutputException))
         {
@@ -216,7 +248,9 @@ public sealed class ConsultationService(
                 Answer = GroundedAnswers.Answers[0],
                 Recommendations = context.Select(x => new ProductRecommendation(x.Product.Id, GroundedAnswers.Reason(x.Product))).ToList()
             };
-            validated = await validator.ValidateAsync(fallback, context, plan, ct);
+            validated = await MeasureAsync(
+                () => validator.ValidateAsync(fallback, context, plan, ct),
+                elapsed => timing.ValidationMs = (timing.ValidationMs ?? 0) + elapsed);
         }
 
         if (validated is null)
@@ -224,11 +258,23 @@ public sealed class ConsultationService(
             return Result("موجودی یا اطلاعات محصولات تغییر کرده است؛ دوباره جست‌وجو کنید.", [], "no-results");
         }
 
-        var answer = validated.NeedsMoreInformation
-            ? validated.Answer + "\n" + validated.FollowUpQuestion
-            : validated.Answer;
+        var answer = validated.NeedsMoreInformation ? validated.Answer + "\n" + validated.FollowUpQuestion : validated.Answer;
 
         return Finish(Result(answer, validated.Products, mode, notice, validated.NeedsMoreInformation, validated.FollowUpQuestion));
+    }
+
+    private static async Task<T> MeasureAsync<T>(Func<Task<T>> operation, Action<double> record)
+    {
+        var timer = Stopwatch.StartNew();
+        try
+        {
+            return await operation();
+        }
+        finally
+        {
+            timer.Stop();
+            record(timer.Elapsed.TotalMilliseconds);
+        }
     }
 
     private async Task<ConsultationResult> GenerateAnswerAsync(string message, IntentDecision intent, IReadOnlyList<ProductMatch> context, CancellationToken ct)

@@ -101,8 +101,7 @@ public sealed partial class IntentClassifier(IOllamaClient ollama, IConfiguratio
         }
         // A standalone concern (for example, "موهام زود چرب میشه") is a consultation request,
         // even when the customer does not explicitly say "recommend a product".
-        if (HasProductDomain(normalized)
-            && normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+        if (HasProductDomain(normalized) && normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Any(word => CustomerConcernRoots.Any(root => word.StartsWith(root, StringComparison.Ordinal)))
             && (!context.HasProductContext || !Has(normalized, ProductFollowUpReferences)))
         {

@@ -21,6 +21,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<ProductEmbedding> ProductEmbeddings => Set<ProductEmbedding>();
 
+    public DbSet<ConsultationPerformanceLog> ConsultationPerformanceLogs => Set<ConsultationPerformanceLog>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -96,6 +98,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.ContentHash).HasMaxLength(64);
             entity.Property(x => x.UpdatedAtUtc).HasDefaultValueSql("SYSUTCDATETIME()");
             entity.HasOne<Product>().WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.NoAction);
+        });
+        modelBuilder.Entity<ConsultationPerformanceLog>(entity =>
+        {
+            entity.ToTable("ConsultationPerformanceLogs");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Outcome).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.ErrorType).HasMaxLength(200);
+            entity.Property(x => x.Intent).HasMaxLength(40);
+            entity.Property(x => x.RetrievalMethod).HasMaxLength(60);
+            entity.Property(x => x.ResponseMode).HasMaxLength(30);
+            entity.HasIndex(x => x.StartedAtUtc);
         });
     }
 }

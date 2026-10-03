@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Infrastructure;
 using SkinRag.Api.Models;
@@ -13,21 +14,28 @@ public sealed class ProductRetriever(
 {
     public async Task<RetrievalResult> RetrieveAsync(SearchPlan plan, CancellationToken ct)
     {
+        var sqlTimer = Stopwatch.StartNew();
         var eligible = await repository.EligibleIdsAsync(plan, ct);
+        sqlTimer.Stop();
+        var sqlFilterMs = sqlTimer.Elapsed.TotalMilliseconds;
         if (eligible.Length == 0)
         {
-            return new([], 0, index.Snapshot().UpdatedAtUtc, "sql-filters");
+            return new([], 0, index.Snapshot().UpdatedAtUtc, "sql-filters", sqlFilterMs);
         }
 
         if (plan.ProductIds.Length > 0)
         {
+            var directLoadTimer = Stopwatch.StartNew();
             var direct = await repository.LoadAsync(eligible, plan, ct);
+            directLoadTimer.Stop();
             return new(
                 direct.OrderBy(p => Array.IndexOf(plan.ProductIds, p.Id)).Select(p => new ProductMatch(p, 1, 1))
                 .ToArray(),
                 eligible.Length,
                 null,
-                "sql-product-reference");
+                "sql-product-reference",
+                sqlFilterMs,
+                ProductLoadMs: directLoadTimer.Elapsed.TotalMilliseconds);
         }
 
         var snapshot = index.Snapshot();
@@ -43,7 +51,9 @@ public sealed class ProductRetriever(
             return new([], eligible.Length, snapshot.UpdatedAtUtc, "hybrid-vector-lexical");
         }
 
+        var embeddingTimer = Stopwatch.StartNew();
         var vector = await ollama.EmbedAsync((configuration["Rag:QueryPrefix"] ?? "search_query: ") + plan.Query, ct);
+        embeddingTimer.Stop();
         if (candidates.Any(d => d.Embedding.Length != vector.Length))
         {
             throw new IndexNotReadyException("ابعاد بردار مدل تغییر کرده است؛ بازسازی کامل دانش لازم است.");
@@ -70,10 +80,19 @@ public sealed class ProductRetriever(
             .Take(plan.PreferBudget ? topK * 4 : topK)
             .ToArray();
         // Prices/stock are re-read from SQL, even when a cached embedding was used.
+        var loadTimer = Stopwatch.StartNew();
         var live = (await repository.LoadAsync(ranked.Select(x => x.Id), plan, ct)).ToDictionary(x => x.Id);
+        loadTimer.Stop();
         IEnumerable<ProductMatch> matches = ranked.Where(x => live.ContainsKey(x.Id)).Select(x => new ProductMatch(live[x.Id], Math.Round(x.Similarity, 4), Math.Round(x.Score, 4)));
         matches = plan.PreferBudget ? matches.OrderBy(x => x.Product.Price).ThenByDescending(x => x.Score) : matches;
-        return new(matches.Take(topK).ToArray(), eligible.Length, snapshot.UpdatedAtUtc, "hybrid-vector-lexical");
+        return new(
+            matches.Take(topK).ToArray(),
+            eligible.Length,
+            snapshot.UpdatedAtUtc,
+            "hybrid-vector-lexical",
+            sqlFilterMs,
+            embeddingTimer.Elapsed.TotalMilliseconds,
+            loadTimer.Elapsed.TotalMilliseconds);
     }
 
     public static double Cosine(float[] a, float[] b, double normA, double normB)

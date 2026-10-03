@@ -8,8 +8,7 @@ namespace SkinRag.Api.Application.Consultation;
 internal static class ConsultationAnswerFormatter
 {
     public static string Price(ProductDto p) => p.Price.HasValue ? $"قیمت ثبت‌شده از {p.Price.Value.ToString("N0", CultureInfo.InvariantCulture)} ریال." : "قیمت ثبت نشده است.";
-    public static string InformationAnswer(IEnumerable<ProductMatch> matches, ConsultationIntent intent, CatalogVocabulary vocabulary) => string.Join(
-        "\n\n",
+    public static string InformationAnswer(IEnumerable<ProductMatch> matches, ConsultationIntent intent, CatalogVocabulary vocabulary) => string.Join("\n\n",
         matches.Select(m =>
         {
             var p = m.Product;
