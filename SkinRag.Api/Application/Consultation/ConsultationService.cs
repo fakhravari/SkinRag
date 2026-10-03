@@ -26,7 +26,11 @@ public sealed class ConsultationService(
 {
     public async Task<ConsultationResponse> AskAsync(ConsultationRequest request, CancellationToken ct)
     {
-        var timing = new ConsultationPerformanceLog { StartedAtUtc = DateTime.UtcNow };
+        var start = DateTime.Now;
+        var timing = new ConsultationPerformanceLog
+        {
+            StartedAtLocal = start
+        };
         var totalTimer = Stopwatch.StartNew();
         try
         {
@@ -47,7 +51,7 @@ public sealed class ConsultationService(
         finally
         {
             totalTimer.Stop();
-            timing.CompletedAtUtc = DateTime.UtcNow;
+            timing.CompletedAtLocal = DateTime.Now;
             timing.TotalMs = (long)totalTimer.Elapsed.TotalMilliseconds;
             performanceQueue.Enqueue(timing);
         }

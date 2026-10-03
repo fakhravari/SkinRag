@@ -103,12 +103,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("ConsultationPerformanceLogs");
             entity.HasKey(x => x.Id);
+            entity.Property(x => x.StartedAtLocal).HasColumnType("datetime2(3)");
+            entity.Property(x => x.CompletedAtLocal).HasColumnType("datetime2(3)");
             entity.Property(x => x.Outcome).HasMaxLength(20).IsRequired();
             entity.Property(x => x.ErrorType).HasMaxLength(200);
             entity.Property(x => x.Intent).HasMaxLength(40);
             entity.Property(x => x.RetrievalMethod).HasMaxLength(60);
             entity.Property(x => x.ResponseMode).HasMaxLength(30);
-            entity.HasIndex(x => x.StartedAtUtc);
+            entity.HasIndex(x => x.StartedAtLocal);
         });
     }
 }

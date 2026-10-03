@@ -3,8 +3,8 @@ namespace SkinRag.Api.Models;
 public sealed class ConsultationPerformanceLog
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public DateTime StartedAtUtc { get; set; }
-    public DateTime CompletedAtUtc { get; set; }
+    public DateTime StartedAtLocal { get; set; }
+    public DateTime CompletedAtLocal { get; set; }
     public long TotalMs { get; set; }
     public double? IntentMs { get; set; }
     public double? CatalogReadMs { get; set; }
