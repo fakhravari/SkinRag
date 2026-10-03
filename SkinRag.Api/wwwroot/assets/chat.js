@@ -25,6 +25,14 @@
         function scrollToEnd() {
             $conversation.scrollTop($conversation[0].scrollHeight);
         }
+        function scrollToConversation() {
+            var conversation = $conversation[0];
+            if (!conversation) return;
+            var topbar = document.querySelector(".topbar"),
+                offset = topbar ? topbar.getBoundingClientRect().height : 0,
+                top = window.scrollY + conversation.getBoundingClientRect().top - offset - 12;
+            window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+        }
         function setBusy(value) {
             busy = value;
             $("#sendMessage").prop("disabled", busy);
@@ -63,10 +71,16 @@
                 label = $("label[for='" + id.slice(1) + "']").text().trim();
             if (!Array.isArray(selected)) selected = selected ? [selected] : [];
             if (!$dropdown.length) {
+                var $fieldLabel = $("label[for='" + id.slice(1) + "']"),
+                    fieldId = id.slice(1),
+                    $dropdownLabel = $("<span>").attr("id", fieldId + "DropdownLabel").addClass("check-dropdown-label");
+                $fieldLabel.contents().appendTo($dropdownLabel);
+                $fieldLabel.remove();
                 $dropdown = $("<details>").addClass("check-dropdown");
                 $dropdown.append(
-                    $("<summary>").attr("aria-label", label).append(
-                        $("<span>").addClass("check-dropdown-value"),
+                    $("<summary>").attr("aria-labelledby", fieldId + "DropdownLabel " + fieldId + "DropdownValue").append(
+                        $dropdownLabel,
+                        $("<span>").attr("id", fieldId + "DropdownValue").addClass("check-dropdown-value"),
                     ),
                     $("<div>").addClass("check-dropdown-options").attr({ role: "group", "aria-label": label }),
                 );
@@ -199,7 +213,7 @@
                     fillSelect(
                         "#hairType",
                         data.profiles.filter(function (p) {
-                            return p.kind === "hair";
+                            return p.kind === "hair" && p.slug !== "hair-all";
                         }),
                         "مشخص نشده",
                         true,
@@ -735,6 +749,7 @@
             // Filter search must never include draft chat text.
             $question.val("").trigger("input");
             $("#chatForm").trigger("submit");
+            scrollToConversation();
         });
         $(".example-question").on("click", function () {
             if (busy) return;

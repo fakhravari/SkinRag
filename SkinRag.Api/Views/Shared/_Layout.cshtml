@@ -46,10 +46,19 @@
                 مدیریت دانش
             </a>
         </nav>
-        <span class="pill warn">
-            <span class="dot"></span>
-            محیط آزمایشی
-        </span>
+        <div class="topbar-status" aria-label="وضعیت سرویس">
+            @if (page == "Chat")
+            {
+                <span id="connectionBadge" class="pill warn" role="status">
+                    <span class="dot"></span>
+                    <span>در حال اتصال</span>
+                </span>
+            }
+            <span class="pill warn">
+                <span class="dot"></span>
+                محیط آزمایشی
+            </span>
+        </div>
     </div>
 </header>
 @RenderBody()

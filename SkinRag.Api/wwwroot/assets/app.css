@@ -130,6 +130,12 @@ h3 {
     gap: 24px;
     min-height: 88px;
 }
+.topbar-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
 .brand {
     display: flex;
     align-items: center;
@@ -1518,9 +1524,6 @@ code {
         gap: 14px;
         padding: 14px 0;
     }
-    .topbar-inner > .pill {
-        display: none;
-    }
     .brand-name {
         font-size: 20px;
     }
@@ -1801,10 +1804,10 @@ h3 {
     display: inline-flex;
 }
 .chat-panel {
-    min-height: 700px;
+    min-height: 740px;
 }
 .conversation {
-    height: 500px;
+    height: 540px;
 }
 .thinking {
     flex-wrap: wrap;
@@ -1847,10 +1850,10 @@ h3 {
         font-size: 15px;
     }
     .conversation {
-        height: 440px;
+        height: 480px;
     }
     .chat-panel {
-        min-height: 640px;
+        min-height: 680px;
     }
     .nav a {
         font-size: 13px;
@@ -2210,6 +2213,24 @@ body {
     max-height: 220px;
     gap: 1px;
     padding: 4px;
+}
+.filters-panel .check-dropdown-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.filters-panel .check-dropdown-label .icon {
+    width: 17px;
+    height: 17px;
+    color: var(--purple);
 }
 .filters-panel .field > label {
     font-size: 15px;
