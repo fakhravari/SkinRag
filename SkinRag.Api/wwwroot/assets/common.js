@@ -12,7 +12,12 @@
             var date = new Date(value);
             return isNaN(date.getTime())
                 ? "—"
-                : date.toLocaleString("fa-IR", { dateStyle: "short", timeStyle: "short" });
+                : date.toLocaleString("fa-IR", {
+                      dateStyle: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                  });
         },
         time: function () {
             return new Date().toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" });
