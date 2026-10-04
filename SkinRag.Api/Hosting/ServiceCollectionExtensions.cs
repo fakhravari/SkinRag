@@ -26,6 +26,7 @@ public static class ServiceCollectionExtensions
 
     private static void AddWebServices(IServiceCollection services)
     {
+        services.AddHttpContextAccessor();
         services.AddControllersWithViews();
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();

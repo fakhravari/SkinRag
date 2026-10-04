@@ -1,8 +1,10 @@
-namespace SkinRag.Api.Domain.Catalog;
+﻿namespace SkinRag.Api.Domain.Catalog;
 
 public sealed class Product
 {
     public int Id { get; set; }
+    public int IdCategory { get; set; }
+    public int IdBrand { get; set; }
     public string Name { get; set; } = "";
     public string Brand { get; set; } = "بدون برند";
     public string Category { get; set; } = "";
@@ -15,8 +17,6 @@ public sealed class Product
     public int StockQuantity { get; set; }
     public bool IsActive { get; set; }
     public string Sku { get; set; } = "";
-    public int CategoryId { get; set; }
-    public int BrandId { get; set; }
     public string HairTypes { get; set; } = "نامشخص";
     public string UsageInstructions { get; set; } = "اطلاعات روش مصرف ثبت نشده";
     public string SearchKeywords { get; set; } = "";

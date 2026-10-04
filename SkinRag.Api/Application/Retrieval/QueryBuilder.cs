@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.RegularExpressions;
 using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Common.Text;
@@ -44,16 +44,13 @@ public sealed partial class QueryBuilder(
         }
 
         var text = PersianText.Normalize(message);
-        var isPersianDrySkinMoisturizer = decision.Intent == ConsultationIntent.ProductSearch
-                                          && IsDrySkinMoisturizerRequest(text);
-        var ruleDomain = request.Domain ?? ResolveDomain(text, vocabulary.Categories);
+        var ruleDomain = request.Domain ?? ResolveDomain(text, vocabulary.Categories, vocabulary.CatalogPhrases);
         var ruleAttributeText = PersianText.Normalize($"{text} {request.Concern}");
         var candidateCategorySlug = decision.Intent == ConsultationIntent.ProductSearch
             // Prefer a catalog label the customer actually used over a broad rule.
             // For example, "سرم آبرسان" must stay a serum instead of being rewritten
             // to the general face-moisturizer category by the word "آبرسان".
-            ? MatchUniqueCategory(ruleAttributeText, vocabulary.Categories, ruleDomain)?.Slug
-              ?? ExplicitRuleCategorySlug(text, ruleDomain)
+            ? MatchUniqueCategory(ruleAttributeText, vocabulary.Categories, ruleDomain, vocabulary.CatalogPhrases)?.Slug
             : null;
         var ruleCategorySlug = candidateCategorySlug is not null
                                && (ruleDomain is null || CategoryBelongsToDomain(candidateCategorySlug, ruleDomain,
@@ -127,7 +124,7 @@ public sealed partial class QueryBuilder(
             foreach (var selectedDomain in request.Domains.Append(request.Domain)
                          .Where(x => !string.IsNullOrWhiteSpace(x)).Distinct())
             {
-                terms.Add(vocabulary.Categories.FirstOrDefault(x => x.ParentId is null && x.Domain == selectedDomain)
+                terms.Add(vocabulary.Categories.FirstOrDefault(x => x.IdParent is null && x.Domain == selectedDomain)
                     ?.Name ?? selectedDomain!);
             }
 
@@ -141,14 +138,14 @@ public sealed partial class QueryBuilder(
             foreach (var skinType in request.SkinTypes.Append(request.SkinType)
                          .Where(x => !string.IsNullOrWhiteSpace(x)).Distinct())
             {
-                if (vocabulary.Profiles.FirstOrDefault(x => x.Slug == skinType) is { } skinProfile)
+                if (vocabulary.CatalogProfiles.FirstOrDefault(x => x.Slug == skinType) is { } skinProfile)
                     terms.Add(skinProfile.Name);
             }
 
             foreach (var hairType in request.HairTypes.Append(request.HairType)
                          .Where(x => !string.IsNullOrWhiteSpace(x)).Distinct())
             {
-                if (vocabulary.Profiles.FirstOrDefault(x => x.Slug == hairType) is { } hairProfile)
+                if (vocabulary.CatalogProfiles.FirstOrDefault(x => x.Slug == hairType) is { } hairProfile)
                     terms.Add(hairProfile.Name);
             }
 
@@ -196,12 +193,7 @@ public sealed partial class QueryBuilder(
                              || HasExplicitRequestFilters(request)
                              || writtenBudget.HasValue
                              || budgetInput.MinimumPriceRials.HasValue;
-        if (isPersianDrySkinMoisturizer)
-        {
-            source = "persian-product-rule";
-            parsed = CreateRuleOutput(text, ruleAttributeText, "skin", "face-moisturizer", vocabulary);
-        }
-        else if (decision.Intent == ConsultationIntent.ProductSearch && hasRuleFilters)
+        if (decision.Intent == ConsultationIntent.ProductSearch && hasRuleFilters)
         {
             source = ruleCategorySlug is null ? "explicit-filter-rules" : "explicit-category-rule";
             parsed = ruleOutput;
@@ -221,9 +213,9 @@ public sealed partial class QueryBuilder(
                     ex.GetType().Name);
                 source = $"explicit-filters:{ex.GetType().Name}";
                 var fallbackText = previous is null ? message : previous + " " + message;
-                var fallbackSearchText = $"{fallbackText} {CustomerLanguageQuery.ExpandTerms(fallbackText)}";
-                var domain = request.Domain ?? ResolveDomain(fallbackSearchText, vocabulary.Categories);
-                var profileMatches = vocabulary.Profiles.Where(x =>
+                var fallbackSearchText = $"{fallbackText} {CustomerLanguageQuery.ExpandTerms(fallbackText, vocabulary.CatalogPhrases)}";
+                var domain = request.Domain ?? ResolveDomain(fallbackSearchText, vocabulary.Categories, vocabulary.CatalogPhrases);
+                var profileMatches = vocabulary.CatalogProfiles.Where(x =>
                         (domain is null || x.Kind == domain) &&
                         LabelScore(PersianText.Normalize(fallbackSearchText), x.Name) > 0)
                     .ToArray();
@@ -292,7 +284,7 @@ public sealed partial class QueryBuilder(
         // Relative requests seek alternatives, rather than being pinned to the earlier product IDs.
         var budget = parsed.PricePreference == "budget" || IsBudgetRequest(text);
         return CheckBudgetBounds(new SearchPlan(
-            CustomerLanguageQuery.AppendCatalogTerms(parsed.Query, message),
+            CustomerLanguageQuery.AppendCatalogTerms(parsed.Query, message, vocabulary.CatalogPhrases),
             filters,
             decision.Intent,
             concerns,
@@ -326,13 +318,13 @@ public sealed partial class QueryBuilder(
         }
 
         if (value.SkinType is not null
-            && !vocabulary.Profiles.Any(x => x.Kind == "skin" && x.Slug == value.SkinType))
+            && !vocabulary.CatalogProfiles.Any(x => x.Kind == "skin" && x.Slug == value.SkinType))
         {
             return false;
         }
 
         if (value.HairType is not null
-            && !vocabulary.Profiles.Any(x => x.Kind == "hair" && x.Slug == value.HairType))
+            && !vocabulary.CatalogProfiles.Any(x => x.Kind == "hair" && x.Slug == value.HairType))
         {
             return false;
         }
@@ -441,84 +433,9 @@ public sealed partial class QueryBuilder(
             .Count(t => words.Any(word => suffixes.Any(s => word == t + s)));
     }
 
-    private static string? ScopeDomain(string message)
-    {
-        var text = PersianText.Normalize(message);
-        var fragrance = HasAny(text,
-                            "خوشبو کننده", "خوشبوکننده", "خوشبو کننده بدن", "عطر", "ادکلن", "بادی اسپلش", "ضد تعریق",
-                            "ضدتعریق")
-                        && !HasAny(text, "بدون عطر", "بدون رایحه", "فاقد عطر", "فاقد رایحه", "بی عطر", "عاری از عطر");
-        var cellulose = HasAny(text, "سلولزی", "دستمال", "گوش پاک کن", "گوش پاککن", "پد آرایش پاک کن", "نوار بهداشتی",
-            "پد روزانه");
-        var bundles = HasAny(text, "بسته ترکیبی", "بسته های ترکیبی", "بسته‌های ترکیبی", "پک ترکیبی", "بسته محصولات");
-        var campaigns = HasAny(text, "جشنواره شگفت انگیز", "جشنواره شگفت‌انگیز", "جشنواره");
-        var food = HasAny(text, "نوشیدنی", "خوراکی", "نوشیدنی سرد", "نوشیدنی گرم");
-        var promotional = HasAny(text,
-            "کالای تبلیغاتی", "محصول تبلیغاتی", "محتوای آموزشی", "محتوی آموزشی", "نشان و جوایز", "تجهیزات جانبی",
-            "پوشاک", "لباس", "جوراب", "شال", "پیراهن", "تی شرت", "کتاب", "مجله", "بروشور", "کاتالوگ", "دفترچه فاکتور",
-            "کلربوک");
-        var other = HasAny(text, "محصولات دیگر", "محصول دیگر", "سایر محصولات");
-        var personalCare = HasAny(text,
-            "بهداشتی و مراقبتی", "مراقبت دست و صورت", "مراقبت دست و ناخن", "مراقبت دهان و دندان", "مراقبت پا",
-            "مسواک", "خمیر دندان", "نخ دندان", "ضد ترک پا", "مراقبت بدن", "شامپو بدن");
-        var hair = HasAny(text, "مو", "موی", "موهام", "موها", "شامپو", "نرم کننده", "کراتین", "روغن مو", "سرم مو",
-            "ماسک مو", "موس مو");
-        var beauty = HasAny(
-            text,
-            "آرایش", "آرایشی", "زیبایی", "رژ", "ریمل", "کانسیلر", "سایه", "خط چشم", "کرم پودر", "لاک", "رژگونه",
-            "برنزر", "برانزر",
-            "برق لب", "لیپ گلاس", "بی بی کرم", "پرایمر", "پنکیک", "مداد ابرو", "هایلایتر", "آی لاینر", "فاندیشن");
-        var skin = HasAny(
-            text,
-            "پوست",
-            "پوستم",
-            "ضدآفتاب",
-            "ضد آفتاب",
-            "آبرسان",
-            "مرطوب کننده",
-            "شوینده",
-            "صورت",
-            "شامپو بدن",
-            "بدن",
-            "دست",
-            "بالم لب",
-            "میسلار",
-            "لوسیون");
-        if (text.Contains("شامپو بدن"))
-        {
-            hair = false;
-        }
-
-        // A specific catalog class takes precedence over a generic word such as
-        // "آرایش" inside "پد آرایش پاک‌کن" or "بهداشتی" inside "نوار بهداشتی".
-        if (cellulose || food || bundles || campaigns || other || personalCare || promotional)
-        {
-            beauty = false;
-            skin = false;
-            hair = false;
-        }
-
-        return (fragrance, cellulose, food, bundles, campaigns, other, personalCare, promotional, hair, beauty,
-                skin) switch
-            {
-                (true, false, false, false, false, false, false, false, false, false, false) => "fragrance",
-                (false, true, false, false, false, false, false, false, false, false, false) => "cellulose",
-                (false, false, true, false, false, false, false, false, false, false, false) => "food",
-                (false, false, false, true, false, false, false, false, false, false, false) => "bundles",
-                (false, false, false, false, true, false, false, false, false, false, false) => "campaigns",
-                (false, false, false, false, false, true, false, false, false, false, false) => "other",
-                (false, false, false, false, false, false, true, false, false, false, false) => "personal-care",
-                (false, false, false, false, false, false, false, true, false, false, false) => "promotional",
-                (false, false, false, false, false, false, false, false, true, false, false) => "hair",
-                (false, false, false, false, false, false, false, false, false, true, false) => "beauty",
-                (false, false, false, false, false, false, false, false, false, false, true) => "skin",
-                _ => null
-            };
-    }
-
     private static string? ExplicitCategory(string text, string? domain, CatalogVocabulary vocabulary)
     {
-        var slug = ExplicitRuleCategorySlug(text, domain);
+        var slug = MatchUniqueCategory(text, vocabulary.Categories, domain, vocabulary.CatalogPhrases)?.Slug;
         if (vocabulary.Categories.Any(x => x.Slug == slug))
         {
             return slug;
@@ -532,15 +449,6 @@ public sealed partial class QueryBuilder(
             .FirstOrDefault();
     }
 
-    private static bool IsDrySkinMoisturizerRequest(string text)
-    {
-        var drySkin = HasAny(text, "خشک", "خشکه", "خشکی")
-                      && HasAny(text, "پوست", "پوستم", "پوستت", "پوستام", "پوستای", "پوستها", "پوست های", "پوستهای",
-                          "صورت", "صورتم");
-        var moisturizer = HasAny(text, "مرطوب کننده", "مرطوبکننده", "آبرسان");
-        return drySkin && moisturizer;
-    }
-
     private static bool IsBudgetRequest(string text)
     {
         return HasAny(text,
@@ -548,26 +456,7 @@ public sealed partial class QueryBuilder(
             "اقتصادی", "به صرفه", "مقرون به صرفه", "قیمت مناسب");
     }
 
-    private static string? ExplicitRuleCategorySlug(string text, string? domain)
-    {
-        return domain switch
-        {
-            "skin" when HasAny(text, "ضدآفتاب", "ضد آفتاب") => "sun-screen",
-            "skin" when HasAny(text, "مرطوب کننده", "مرطوبکننده", "آبرسان", "آبرسانی", "moisturizer", "moisturiser") =>
-                "face-moisturizer",
-            "skin" when HasAny(text, "شوینده") => "gentle-cleanser",
-            "hair" when HasAny(text, "کرم")
-                        && HasAny(text, "مو", "موی", "موها", "موهای", "موهام")
-                        && HasAny(text, "بدون آبکشی", "بدون نیاز به آبکشی", "leave in", "leave-in", "leavein",
-                            "بعد حمام", "بعد از حمام", "پس از حمام", "نشورمش", "نشورم") => "leave-in",
-            "beauty" when HasAny(text, "رژلب", "lipstick", "lip stick") ||
-                          (domain == "beauty" && HasAny(text, "رژ") && HasAny(text, "لب")) => "lipstick",
-            "beauty" when HasAny(text, "ریمل") => "mascara",
-            _ => null
-        };
-    }
-
-    private static Profile? MatchUniqueProfile(string text, IEnumerable<Profile> profiles)
+    private static CatalogProfile? MatchUniqueCatalogProfile(string text, IEnumerable<CatalogProfile> profiles)
     {
         var matches = profiles.Where(x => LabelScore(text, x.Name) > 0).ToArray();
         return matches.Length == 1 ? matches[0] : null;
@@ -598,8 +487,8 @@ public sealed partial class QueryBuilder(
         string? categorySlug,
         CatalogVocabulary vocabulary)
     {
-        var profile = MatchUniqueProfile(attributeText,
-            vocabulary.Profiles.Where(x => domain is null || x.Kind == domain));
+        var profile = MatchUniqueCatalogProfile(attributeText,
+            vocabulary.CatalogProfiles.Where(x => domain is null || x.Kind == domain));
         return new QueryModelOutput
         {
             Query = text,
@@ -618,11 +507,17 @@ public sealed partial class QueryBuilder(
         };
     }
 
-    private static string? ResolveDomain(string message, IEnumerable<Category> categories)
+    private static string? ResolveDomain(string message, IEnumerable<Category> categories,
+        IEnumerable<CatalogPhrase>? catalogPhrases = null)
     {
         var text = PersianText.Normalize(message);
         var all = categories.ToArray();
-        var heuristicDomain = ScopeDomain(text);
+        var phraseMatch = MatchUniqueCategory(text, all, null, catalogPhrases);
+        if (phraseMatch is not null)
+        {
+            return phraseMatch.Domain;
+        }
+
         var exact = all.Where(x => HasAny(text, PersianText.Normalize(x.Name))
                                    || HasAny(text, PersianText.Normalize(x.Slug.Replace('-', ' '))))
             .DistinctBy(x => x.Slug)
@@ -638,7 +533,7 @@ public sealed partial class QueryBuilder(
             }
         }
 
-        return heuristicDomain ?? MatchUniqueCategory(text, all, null)?.Domain;
+        return MatchUniqueCategory(text, all, null)?.Domain;
     }
 
     private static bool HasRuleFilters(QueryModelOutput parsed, ParsedSize? size)
@@ -678,13 +573,33 @@ public sealed partial class QueryBuilder(
                || request.Shades.Length > 0 || request.Finishes.Length > 0;
     }
 
-    private static Category? MatchUniqueCategory(string text, IEnumerable<Category> categories, string? domain)
+    private static Category? MatchUniqueCategory(string text, IEnumerable<Category> categories, string? domain,
+        IEnumerable<CatalogPhrase>? catalogPhrases = null)
     {
         var all = categories.ToArray();
         // A selected domain scopes category inference to categories actually
         // assigned to it. Ancestor-domain checks can pull a same-name category
         // from a different normalized domain into the match set.
         var candidates = all.Where(x => domain is null || x.Domain == domain).ToArray();
+        var candidateIds = candidates.Select(x => x.Id).ToHashSet();
+        var normalizedText = " " + PersianText.Normalize(text) + " ";
+        var phraseMatches = (catalogPhrases ?? [])
+            .Where(x => x.IsActive && x.IdCategory is { } categoryId && candidateIds.Contains(categoryId)
+                        && x.Category is not null
+                        && normalizedText.Contains(" " + PersianText.Normalize(x.Phrase) + " ", StringComparison.Ordinal))
+            .OrderByDescending(x => PersianText.SearchTokens(x.Phrase).Count)
+            .ThenByDescending(x => x.Priority)
+            .ToArray();
+        if (phraseMatches.Length > 0)
+        {
+            var bestLength = PersianText.SearchTokens(phraseMatches[0].Phrase).Count;
+            var bestPriority = phraseMatches[0].Priority;
+            var bestPhraseCategories = phraseMatches.Where(x => PersianText.SearchTokens(x.Phrase).Count == bestLength
+                                                                 && x.Priority == bestPriority)
+                .Select(x => x.Category!).DistinctBy(x => x.Id).ToArray();
+            return bestPhraseCategories.Length == 1 ? bestPhraseCategories[0] : null;
+        }
+
         var exact = candidates.Where(x => HasAny(text, PersianText.Normalize(x.Name))
                                           || HasAny(text, PersianText.Normalize(x.Slug.Replace('-', ' '))))
             .DistinctBy(x => x.Slug)
@@ -708,7 +623,7 @@ public sealed partial class QueryBuilder(
                 var depth = 0;
                 var current = category;
                 var visited = new HashSet<int> { current.Id };
-                while (current.ParentId is { } parentId && byId.TryGetValue(parentId, out var parent) &&
+                while (current.IdParent is { } parentId && byId.TryGetValue(parentId, out var parent) &&
                        visited.Add(parent.Id))
                 {
                     depth++;
@@ -753,7 +668,7 @@ public sealed partial class QueryBuilder(
                 return true;
             }
 
-            current = current.ParentId is { } parentId && byId.TryGetValue(parentId, out var parent) ? parent : null;
+            current = current.IdParent is { } parentId && byId.TryGetValue(parentId, out var parent) ? parent : null;
         }
 
         return false;
@@ -880,9 +795,9 @@ public sealed partial class QueryBuilder(
     {
         // Keep extraction context small enough for the configured local model window.
         // This narrows the vocabulary only; an inferred scope is not a hard SQL filter.
-        var customerLanguageTerms = CustomerLanguageQuery.ExpandTerms(message);
+        var customerLanguageTerms = CustomerLanguageQuery.ExpandTerms(message, vocabulary.CatalogPhrases);
         var scopeText = $"{message} {previous} {customerLanguageTerms}";
-        var scope = request.Domain ?? ResolveDomain(scopeText, vocabulary.Categories);
+        var scope = request.Domain ?? ResolveDomain(scopeText, vocabulary.Categories, vocabulary.CatalogPhrases);
         var searchText = PersianText.Normalize(scopeText);
         var scoped = vocabulary with
         {
@@ -902,7 +817,7 @@ public sealed partial class QueryBuilder(
                 .Where(x => LabelScore(searchText, x.Name + " " + x.SearchTerms) > 0)
                 .Take(3)
                 .ToArray(),
-            Profiles = vocabulary.Profiles
+            CatalogProfiles = vocabulary.CatalogProfiles
                 .Where(x => (scope is null || x.Kind == scope) && LabelScore(searchText, x.Name) > 0)
                 .Take(4)
                 .ToArray(),
@@ -950,9 +865,9 @@ public sealed partial class QueryBuilder(
                 PipelinePrompts.NullableEnum(vocabulary.Categories.Select(x => x.Domain)
                     .Distinct(StringComparer.Ordinal)),
             ["skinType"] =
-                PipelinePrompts.NullableEnum(scoped.Profiles.Where(x => x.Kind == "skin").Select(x => x.Slug)),
+                PipelinePrompts.NullableEnum(scoped.CatalogProfiles.Where(x => x.Kind == "skin").Select(x => x.Slug)),
             ["hairType"] =
-                PipelinePrompts.NullableEnum(scoped.Profiles.Where(x => x.Kind == "hair").Select(x => x.Slug)),
+                PipelinePrompts.NullableEnum(scoped.CatalogProfiles.Where(x => x.Kind == "hair").Select(x => x.Slug)),
             ["categorySlug"] = PipelinePrompts.NullableEnum(scoped.Categories.Select(x => x.Slug)),
             ["brandSlug"] = PipelinePrompts.NullableEnum(scoped.Brands.Select(x => x.Slug)),
             ["shade"] = PipelinePrompts.NullableEnum(vocabulary.Shades ?? []),
@@ -997,7 +912,7 @@ public sealed partial class QueryBuilder(
                 brands = scoped.Brands.Select(x => new[] { x.Slug, x.Name }),
                 shades = vocabulary.Shades ?? [],
                 finishes = vocabulary.Finishes ?? [],
-                profiles = scoped.Profiles.Select(x => new[] { x.Slug, x.Name, x.Kind }),
+                profiles = scoped.CatalogProfiles.Select(x => new[] { x.Slug, x.Name, x.Kind }),
                 concerns = scoped.Concerns.Select(x => new[] { x.Slug, x.Name }),
                 ingredients = scoped.Ingredients.Select(x => new[] { x.Slug, x.Name })
             },

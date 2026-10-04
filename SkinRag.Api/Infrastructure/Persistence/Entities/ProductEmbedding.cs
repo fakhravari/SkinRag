@@ -1,8 +1,8 @@
-namespace SkinRag.Api.Infrastructure.Persistence.Entities;
+﻿namespace SkinRag.Api.Infrastructure.Persistence.Entities;
 
 public sealed class ProductEmbedding
 {
-    public int ProductId { get; set; }
+    public int IdProduct { get; set; }
     public string Model { get; set; } = "";
     public string ContentHash { get; set; } = "";
     public int Dimensions { get; set; }

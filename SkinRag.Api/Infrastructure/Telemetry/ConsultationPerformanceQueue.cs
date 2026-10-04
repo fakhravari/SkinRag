@@ -34,20 +34,30 @@ public sealed class ConsultationPerformanceQueue(
                     batch.Add(item);
                 }
 
-                try
+                var persisted = false;
+                for (var attempt = 1; attempt <= 3 && !persisted; attempt++)
                 {
-                    await using var db = await dbFactory.CreateDbContextAsync(stoppingToken);
-                    db.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.TrackAll;
-                    db.ConsultationPerformanceLogs.AddRange(batch);
-                    await db.SaveChangesAsync(stoppingToken);
-                }
-                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-                {
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Could not persist consultation performance records");
+                    try
+                    {
+                        await using var db = await dbFactory.CreateDbContextAsync(stoppingToken);
+                        db.ConsultationPerformanceLogs.AddRange(batch);
+                        await db.SaveChangesAsync(stoppingToken);
+                        persisted = true;
+                    }
+                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                    {
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex,
+                            "Could not persist consultation performance batch of {Count} records (attempt {Attempt}/3)",
+                            batch.Count, attempt);
+                        if (attempt < 3)
+                        {
+                            await Task.Delay(TimeSpan.FromSeconds(attempt * 2), stoppingToken);
+                        }
+                    }
                 }
             }
         }

@@ -1,4 +1,4 @@
-using SkinRag.Api.Application.Contracts.Catalog;
+﻿using SkinRag.Api.Application.Contracts.Catalog;
 using SkinRag.Api.Application.Intent;
 using SkinRag.Api.Domain.Catalog;
 
@@ -19,11 +19,12 @@ public sealed record SearchPlan(
 public sealed record CatalogVocabulary(
     Category[] Categories,
     Brand[] Brands,
-    Profile[] Profiles,
+    CatalogProfile[] CatalogProfiles,
     Concern[] Concerns,
     Ingredient[] Ingredients,
     string[]? Shades = null,
-    string[]? Finishes = null);
+    string[]? Finishes = null,
+    CatalogPhrase[]? CatalogPhrases = null);
 
 public sealed record RetrievalResult(
     IReadOnlyList<ProductMatch> Products,

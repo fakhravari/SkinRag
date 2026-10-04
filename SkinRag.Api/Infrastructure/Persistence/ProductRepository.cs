@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Contracts.Catalog;
 using SkinRag.Api.Application.Retrieval;
@@ -15,13 +15,24 @@ public sealed class ProductRepository(IDbContextFactory<SkinRagDbContext> factor
         return new CatalogVocabulary(
             await db.Categories.AsNoTracking().ToArrayAsync(ct),
             await db.Brands.AsNoTracking().ToArrayAsync(ct),
-            await db.Profiles.AsNoTracking().ToArrayAsync(ct),
+            await db.CatalogProfiles.AsNoTracking().ToArrayAsync(ct),
             await db.Concerns.AsNoTracking().ToArrayAsync(ct),
             await db.Ingredients.AsNoTracking().ToArrayAsync(ct),
             await db.Products.AsNoTracking().Where(x => x.IsActive).SelectMany(x => x.Variants)
                 .Where(x => x.IsActive && x.Shade != null).Select(x => x.Shade!).Distinct().ToArrayAsync(ct),
             await db.Products.AsNoTracking().Where(x => x.IsActive).SelectMany(x => x.Variants)
-                .Where(x => x.IsActive && x.Finish != null).Select(x => x.Finish!).Distinct().ToArrayAsync(ct));
+                .Where(x => x.IsActive && x.Finish != null).Select(x => x.Finish!).Distinct().ToArrayAsync(ct),
+            await db.CatalogPhrases.AsNoTracking().Include(x => x.Category).Where(x => x.IsActive)
+                .ToArrayAsync(ct));
+    }
+
+    public async Task<IReadOnlyList<Concern>> IntentConcernsAsync(CancellationToken ct)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        return await db.Concerns.AsNoTracking()
+            .Where(x => x.Domain == "skin" || x.Domain == "hair")
+            .OrderBy(x => x.Domain).ThenBy(x => x.Slug)
+            .ToArrayAsync(ct);
     }
 
     public async Task<int[]> EligibleIdsAsync(SearchPlan plan, CancellationToken ct)

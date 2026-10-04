@@ -23,4 +23,11 @@ public sealed class ConsultationPerformanceLog
     public string? QuerySource { get; set; }
     public string? ModelCallsJson { get; set; }
     public string? SearchQuery { get; set; }
+    public string? ClientIpAddress { get; set; }
+    public string? UserAgent { get; set; }
+    public string? BrowserName { get; set; }
+    public string? OperatingSystem { get; set; }
+    public string? RequestPath { get; set; }
+    public string? HttpMethod { get; set; }
+    public string? TraceIdentifier { get; set; }
 }

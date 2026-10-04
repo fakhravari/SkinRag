@@ -1,8 +1,8 @@
-namespace SkinRag.Api.Domain.Catalog;
+﻿namespace SkinRag.Api.Domain.Catalog;
 
 public sealed class ProductConcern
 {
-    public int ProductId { get; set; }
-    public int ConcernId { get; set; }
+    public int IdProduct { get; set; }
+    public int IdConcern { get; set; }
     public Concern Concern { get; set; } = null!;
 }

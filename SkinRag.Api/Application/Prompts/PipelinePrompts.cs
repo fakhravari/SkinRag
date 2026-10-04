@@ -13,6 +13,8 @@ public static class PipelinePrompts
                                  DailyPlans (personal activities/today), Capabilities, Thanks, Farewell, or CasualChat. GREETING topic=Greeting.
                                  Product requests take priority over social phrases in the same message. Talking ABOUT the assistant's
                                  skin/hair/home is personal conversation, not a request to buy or retrieve products.
+                                 A definition/meaning question about a skin or hair concern, without a personal symptom or product request,
+                                 is not a consultation request; classify it UNCLEAR with clarification=General. A customer's own symptom=>SKIN_CONSULTATION.
                                  Product search=>PRODUCT_SEARCH; skin concerns=>SKIN_CONSULTATION; product facts=>PRODUCT_DETAILS;
                                  prices=>PRICE_INQUIRY; stock=>AVAILABILITY_INQUIRY; compare=>PRODUCT_COMPARISON; routine=>ROUTINE_RECOMMENDATION.
                                  FOLLOW_UP means refining an earlier PRODUCT request, not continuing any social conversation.
@@ -33,6 +35,7 @@ public static class PipelinePrompts
                                  "یک شامپو برای موهای چرب معرفی کنید"=>PRODUCT_SEARCH, requiresContext=false.
                                  "یک رژ لب صورتی با جلوه مات می‌خواهم"=>PRODUCT_SEARCH, requiresContext=false.
                                  Sanitized examples based on customer phrasing in the reviewed consultation export:
+                                 "Ù…ÙˆÙ‡Ø§Ù… ÙˆØ²Ù‡"=>SKIN_CONSULTATION, requiresContext=false.
                                  "برای لک‌های پوستم مشاوره می‌خواهم"=>SKIN_CONSULTATION, requiresContext=false.
                                  "موهایم خشک و وز است؛ چه محصولی پیشنهاد می‌کنید؟"=>PRODUCT_SEARCH, requiresContext=false.
                                  "کف سرم خارش دارد و پوسته‌پوسته می‌شود"=>SKIN_CONSULTATION, requiresContext=false.

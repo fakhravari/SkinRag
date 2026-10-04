@@ -1,8 +1,8 @@
-namespace SkinRag.Api.Domain.Catalog;
+﻿namespace SkinRag.Api.Domain.Catalog;
 
 public sealed class ProductProfile
 {
-    public int ProductId { get; set; }
-    public int ProfileId { get; set; }
-    public Profile Profile { get; set; } = null!;
+    public int IdProduct { get; set; }
+    public int IdCatalogProfile { get; set; }
+    public CatalogProfile CatalogProfile { get; set; } = null!;
 }

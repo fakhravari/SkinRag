@@ -455,6 +455,9 @@ h3 {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+.check-dropdown-value.has-count {
+    justify-content: flex-end;
+}
 .check-dropdown-count {
     display: inline-flex;
     align-items: center;
@@ -645,6 +648,22 @@ h3 {
     font-size: 13px;
     color: var(--muted);
 }
+.assistant-heading > div {
+    min-width: 0;
+}
+.filter-summary-badge {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 3px 8px;
+    border: 1px solid #eadff0;
+    border-radius: 999px;
+    background: #f7f1fa;
+    color: var(--purple);
+    font-size: 11px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
 .conversation {
     height: 480px;
     overflow-y: auto;
@@ -681,7 +700,9 @@ h3 {
     color: var(--muted);
     font-size: 15px;
     line-height: 2.2;
-    margin-top: 9px;
+    max-width: 460px;
+    margin: 9px auto 0;
+    text-wrap: balance;
 }
 .example-list {
     display: grid;
@@ -765,6 +786,9 @@ h3 {
     border-start-start-radius: 5px;
 }
 .message-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
     font-size: 13px;
     color: var(--muted);
     margin-top: 6px;
@@ -2234,12 +2258,20 @@ body {
 }
 .filters-panel .field > label {
     font-size: 15px;
+    min-height: 44px;
+    align-items: center;
 }
 .filters-panel .check-dropdown summary {
     min-height: 50px;
+    justify-content: initial;
+    gap: 10px;
+}
+.filters-panel .check-dropdown-label {
+    flex: 0 0 106px;
 }
 .filters-panel .check-dropdown-value {
     font-size: 15px;
+    flex: 1 1 0;
 }
 .filters-panel .check-dropdown-option {
     min-height: 29px;

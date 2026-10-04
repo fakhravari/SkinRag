@@ -24,6 +24,7 @@ public sealed class ConsultationService(
     RecommendationValidator validator,
     ConversationStore conversations,
     IConsultationPerformanceSink performanceSink,
+    IHttpContextAccessor httpContextAccessor,
     IConfiguration configuration,
     ILogger<ConsultationService> logger)
 {
@@ -31,9 +32,18 @@ public sealed class ConsultationService(
     {
         using var modelCallScope = ModelCallTelemetry.Begin(out var modelCalls);
         var start = DateTime.Now;
+        var httpContext = httpContextAccessor.HttpContext;
+        var userAgent = httpContext?.Request.Headers.UserAgent.ToString();
         var timing = new ConsultationPerformanceLog
         {
-            StartedAtLocal = start
+            StartedAtLocal = start,
+            ClientIpAddress = httpContext?.Connection.RemoteIpAddress?.ToString(),
+            UserAgent = Truncate(userAgent, 1000),
+            BrowserName = DetectBrowser(userAgent),
+            OperatingSystem = DetectOperatingSystem(userAgent),
+            RequestPath = Truncate(httpContext?.Request.Path.Value, 512),
+            HttpMethod = Truncate(httpContext?.Request.Method, 10),
+            TraceIdentifier = Truncate(httpContext?.TraceIdentifier, 64)
         };
         var totalTimer = Stopwatch.StartNew();
         try
@@ -64,6 +74,45 @@ public sealed class ConsultationService(
             timing.TotalMs = (long)totalTimer.Elapsed.TotalMilliseconds;
             performanceSink.Enqueue(timing);
         }
+    }
+
+    private static string? Truncate(string? value, int maximumLength)
+    {
+        if (string.IsNullOrEmpty(value)) return value;
+        return value.Length <= maximumLength ? value : value[..maximumLength];
+    }
+
+    private static string? DetectBrowser(string? userAgent)
+    {
+        if (string.IsNullOrWhiteSpace(userAgent)) return null;
+        if (userAgent.Contains("Edg/", StringComparison.OrdinalIgnoreCase)
+            || userAgent.Contains("EdgA/", StringComparison.OrdinalIgnoreCase)
+            || userAgent.Contains("EdgiOS/", StringComparison.OrdinalIgnoreCase)) return "Edge";
+        if (userAgent.Contains("OPR/", StringComparison.OrdinalIgnoreCase)) return "Opera";
+        if (userAgent.Contains("SamsungBrowser/", StringComparison.OrdinalIgnoreCase)) return "Samsung Internet";
+        if (userAgent.Contains("FxiOS/", StringComparison.OrdinalIgnoreCase)) return "Firefox iOS";
+        if (userAgent.Contains("Firefox/", StringComparison.OrdinalIgnoreCase)) return "Firefox";
+        if (userAgent.Contains("CriOS/", StringComparison.OrdinalIgnoreCase)) return "Chrome iOS";
+        if (userAgent.Contains("Chrome/", StringComparison.OrdinalIgnoreCase)) return "Chrome";
+        if (userAgent.Contains("Safari/", StringComparison.OrdinalIgnoreCase)) return "Safari";
+        if (userAgent.Contains("MSIE ", StringComparison.OrdinalIgnoreCase)
+            || userAgent.Contains("Trident/", StringComparison.OrdinalIgnoreCase)) return "Internet Explorer";
+        return "Other";
+    }
+
+    private static string? DetectOperatingSystem(string? userAgent)
+    {
+        if (string.IsNullOrWhiteSpace(userAgent)) return null;
+        if (userAgent.Contains("Android", StringComparison.OrdinalIgnoreCase)) return "Android";
+        if (userAgent.Contains("iPhone", StringComparison.OrdinalIgnoreCase)
+            || userAgent.Contains("iPad", StringComparison.OrdinalIgnoreCase)
+            || userAgent.Contains("iPod", StringComparison.OrdinalIgnoreCase)) return "iOS";
+        if (userAgent.Contains("Windows", StringComparison.OrdinalIgnoreCase)) return "Windows";
+        if (userAgent.Contains("CrOS", StringComparison.OrdinalIgnoreCase)) return "ChromeOS";
+        if (userAgent.Contains("Mac OS", StringComparison.OrdinalIgnoreCase)
+            || userAgent.Contains("Macintosh", StringComparison.OrdinalIgnoreCase)) return "macOS";
+        if (userAgent.Contains("Linux", StringComparison.OrdinalIgnoreCase)) return "Linux";
+        return "Other";
     }
 
     private async Task<ConsultationResponse> AskCoreAsync(ConsultationRequest request, CancellationToken ct,
@@ -283,7 +332,7 @@ public sealed class ConsultationService(
         ValidatedConsultation? validated = null;
         var mode = "model";
         string? notice = null;
-        var useGroundedFastPath = plan.Source is "persian-product-rule" or "explicit-category-rule"
+        var useGroundedFastPath = plan.Source is "explicit-category-rule"
             or "explicit-filter-rules" or "filters-only";
         if (useGroundedFastPath)
         {

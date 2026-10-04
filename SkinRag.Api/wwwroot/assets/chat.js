@@ -8,6 +8,8 @@
             domains = [],
             history = [],
             conversationId = null,
+            currentFilterSummary = "بدون فیلتر · همه محصولات",
+            currentFilterLabels = [],
             pendingRequest = null;
         var indexReady = false,
             filtersReady = false,
@@ -86,14 +88,14 @@
                 );
                 $select.after($dropdown).addClass("filter-source").attr("aria-hidden", "true");
             }
-            var $summary = $dropdown.find(".check-dropdown-value").empty(),
+            var $summary = $dropdown.find(".check-dropdown-value").empty().removeClass("has-count"),
                 optionLabels = selected.map(function (value) {
                     return $select.find("option").filter(function () { return this.value === value; }).text();
                 }).filter(Boolean);
             if (optionLabels.length === 1) $summary.text(optionLabels[0]);
             else if (optionLabels.length > 1) {
-                $summary.append($("<span>").text("مورد انتخاب شد"),
-                    $("<b>").addClass("check-dropdown-count").text(app.number(optionLabels.length)));
+                $summary.addClass("has-count");
+                $summary.append($("<b>").addClass("check-dropdown-count").text(app.number(optionLabels.length)));
             } else $summary.text("انتخاب کنید");
             var $options = $dropdown.find(".check-dropdown-options").empty();
             $select.find("option").each(function () {
@@ -161,15 +163,17 @@
                 },
             );
             var categories = $("#category").val() || [];
-            if (categories.length) labels.push(app.number(categories.length) + " نوع محصول");
+            if (!Array.isArray(categories)) categories = categories ? [categories] : [];
+            labels = labels.concat(categories.map(function (value) {
+                return $("#category option").filter(function () { return this.value === value; }).text();
+            }).filter(Boolean));
             var budget = $("#maxPrice").val();
             if (budget && Number.isFinite(Number(budget)))
                 labels.push("تا " + app.number(Number(budget)) + " ریال");
             if ($("#fragranceFree").prop("checked")) labels.push("بدون عطر");
             if (($("#excludedIngredients").val() || []).length) labels.push("حذف ترکیبات انتخابی");
-            $("#filterSummary").text(
-                labels.length ? labels.join(" · ") : "بدون فیلتر · همه محصولات",
-            );
+            currentFilterLabels = labels.slice();
+            currentFilterSummary = labels.length ? labels.join(" · ") : "بدون فیلتر · همه محصولات";
         }
 
         function loadFilters() {
@@ -350,8 +354,13 @@
             );
             var $bubble = $("<div>").addClass("message-bubble").text(text);
             $message.append($meta, $bubble);
-            if (options.filter)
-                $message.append($("<p>").addClass("message-filter").text(options.filter));
+            if (options.filter) {
+                var $filter = $("<p>").addClass("message-filter");
+                (options.filters || [options.filter]).forEach(function (label) {
+                    $filter.append($("<span>").addClass("filter-summary-badge").text(label));
+                });
+                $message.append($filter);
+            }
             $messages.append($message);
             scrollToEnd();
             return $message;
@@ -558,7 +567,11 @@
                 return;
             }
             request.conversationId = conversationId;
-            addMessage("user", question || "جست‌وجو بر اساس فیلترهای انتخاب‌شده", { filter: $("#filterSummary").text() });
+            var filterSummary = currentFilterSummary;
+            addMessage("user", question || "جست‌وجو بر اساس فیلترهای انتخاب‌شده", {
+                filter: filterSummary,
+                filters: currentFilterLabels,
+            });
             var $thinking = addMessage("assistant", "");
             $thinking
                 .find(".message-bubble")
@@ -734,6 +747,10 @@
             syncCheckboxDropdown("#" + $select.attr("id"));
             if (!isMultiple) $dropdown.prop("open", false);
             $select.trigger("change");
+        });
+        $(document).on("click", ".filters-panel .check-dropdown > summary", function () {
+            var $currentDropdown = $(this).parent();
+            $(".filters-panel .check-dropdown[open]").not($currentDropdown).prop("open", false);
         });
         $(document).on("click", function (event) {
             if (!$(event.target).closest(".check-dropdown").length)

@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using SkinRag.Api.Application.Telemetry;
 using SkinRag.Api.Domain.Catalog;
 using SkinRag.Api.Infrastructure.Persistence.Entities;
@@ -11,9 +11,11 @@ public sealed class SkinRagDbContext(DbContextOptions<SkinRagDbContext> options)
 
     public DbSet<Category> Categories => Set<Category>();
 
+    public DbSet<CatalogPhrase> CatalogPhrases => Set<CatalogPhrase>();
+
     public DbSet<Brand> Brands => Set<Brand>();
 
-    public DbSet<Profile> Profiles => Set<Profile>();
+    public DbSet<CatalogProfile> CatalogProfiles => Set<CatalogProfile>();
 
     public DbSet<Concern> Concerns => Set<Concern>();
 
@@ -58,34 +60,44 @@ public sealed class SkinRagDbContext(DbContextOptions<SkinRagDbContext> options)
             entity.Property(x => x.Currency).HasMaxLength(3).HasDefaultValue("IRR");
             entity.Property(x => x.Image).HasColumnType("nvarchar(max)");
             entity.Property(x => x.UpdatedAtUtc).HasDefaultValueSql("SYSUTCDATETIME()");
-            entity.HasOne(x => x.CategoryDetails).WithMany().HasForeignKey(x => x.CategoryId).IsRequired()
+            entity.HasOne(x => x.CategoryDetails).WithMany().HasForeignKey(x => x.IdCategory).IsRequired()
                 .OnDelete(DeleteBehavior.NoAction);
-            entity.HasOne(x => x.BrandDetails).WithMany().HasForeignKey(x => x.BrandId).IsRequired()
+            entity.HasOne(x => x.BrandDetails).WithMany().HasForeignKey(x => x.IdBrand).IsRequired()
                 .OnDelete(DeleteBehavior.NoAction);
-            entity.HasMany(x => x.Variants).WithOne().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.NoAction);
-            entity.HasMany(x => x.ProductProfiles).WithOne().HasForeignKey(x => x.ProductId)
+            entity.HasMany(x => x.Variants).WithOne().HasForeignKey(x => x.IdProduct).OnDelete(DeleteBehavior.NoAction);
+            entity.HasMany(x => x.ProductProfiles).WithOne().HasForeignKey(x => x.IdProduct)
                 .OnDelete(DeleteBehavior.NoAction);
-            entity.HasMany(x => x.ProductConcerns).WithOne().HasForeignKey(x => x.ProductId)
+            entity.HasMany(x => x.ProductConcerns).WithOne().HasForeignKey(x => x.IdProduct)
                 .OnDelete(DeleteBehavior.NoAction);
-            entity.HasMany(x => x.ProductIngredients).WithOne().HasForeignKey(x => x.ProductId)
+            entity.HasMany(x => x.ProductIngredients).WithOne().HasForeignKey(x => x.IdProduct)
                 .OnDelete(DeleteBehavior.NoAction);
         });
         modelBuilder.Entity<Category>().ToTable("Categories");
-        modelBuilder.Entity<Category>().HasOne(x => x.Parent).WithMany().HasForeignKey(x => x.ParentId)
+        modelBuilder.Entity<Category>().HasOne(x => x.Parent).WithMany().HasForeignKey(x => x.IdParent)
             .OnDelete(DeleteBehavior.NoAction);
+        modelBuilder.Entity<CatalogPhrase>(entity =>
+        {
+            entity.ToTable("CatalogPhrases");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Phrase).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.SearchTerms).HasMaxLength(1000);
+            entity.HasIndex(x => x.Phrase);
+            entity.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.IdCategory)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
         modelBuilder.Entity<Brand>().ToTable("Brands");
-        modelBuilder.Entity<Profile>().ToTable("Profiles");
+        modelBuilder.Entity<CatalogProfile>().ToTable("CatalogProfiles");
         modelBuilder.Entity<Concern>().ToTable("Concerns");
         modelBuilder.Entity<Ingredient>().ToTable("Ingredients");
-        modelBuilder.Entity<ProductProfile>().ToTable("ProductProfiles").HasKey(x => new { x.ProductId, x.ProfileId });
-        modelBuilder.Entity<ProductProfile>().HasOne(x => x.Profile).WithMany().HasForeignKey(x => x.ProfileId)
+        modelBuilder.Entity<ProductProfile>().ToTable("ProductProfiles").HasKey(x => new { x.IdProduct, x.IdCatalogProfile });
+        modelBuilder.Entity<ProductProfile>().HasOne(x => x.CatalogProfile).WithMany().HasForeignKey(x => x.IdCatalogProfile)
             .OnDelete(DeleteBehavior.NoAction);
-        modelBuilder.Entity<ProductConcern>().ToTable("ProductConcerns").HasKey(x => new { x.ProductId, x.ConcernId });
-        modelBuilder.Entity<ProductConcern>().HasOne(x => x.Concern).WithMany().HasForeignKey(x => x.ConcernId)
+        modelBuilder.Entity<ProductConcern>().ToTable("ProductConcerns").HasKey(x => new { x.IdProduct, x.IdConcern });
+        modelBuilder.Entity<ProductConcern>().HasOne(x => x.Concern).WithMany().HasForeignKey(x => x.IdConcern)
             .OnDelete(DeleteBehavior.NoAction);
         modelBuilder.Entity<ProductIngredient>().ToTable("ProductIngredients")
-            .HasKey(x => new { x.ProductId, x.IngredientId });
-        modelBuilder.Entity<ProductIngredient>().HasOne(x => x.Ingredient).WithMany().HasForeignKey(x => x.IngredientId)
+            .HasKey(x => new { x.IdProduct, x.IdIngredient });
+        modelBuilder.Entity<ProductIngredient>().HasOne(x => x.Ingredient).WithMany().HasForeignKey(x => x.IdIngredient)
             .OnDelete(DeleteBehavior.NoAction);
         modelBuilder.Entity<ProductVariant>(entity =>
         {
@@ -97,11 +109,11 @@ public sealed class SkinRagDbContext(DbContextOptions<SkinRagDbContext> options)
         });
         modelBuilder.Entity<ProductEmbedding>(entity =>
         {
-            entity.ToTable("ProductEmbeddings").HasKey(x => new { x.ProductId, x.Model });
+            entity.ToTable("ProductEmbeddings").HasKey(x => new { x.IdProduct, x.Model });
             entity.Property(x => x.Model).HasMaxLength(100);
             entity.Property(x => x.ContentHash).HasMaxLength(64);
             entity.Property(x => x.UpdatedAtUtc).HasDefaultValueSql("SYSUTCDATETIME()");
-            entity.HasOne<Product>().WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne<Product>().WithMany().HasForeignKey(x => x.IdProduct).OnDelete(DeleteBehavior.NoAction);
         });
         modelBuilder.Entity<ConsultationPerformanceLog>(entity =>
         {
@@ -117,6 +129,13 @@ public sealed class SkinRagDbContext(DbContextOptions<SkinRagDbContext> options)
             entity.Property(x => x.QuerySource).HasMaxLength(500);
             entity.Property(x => x.SearchQuery).HasColumnType("nvarchar(max)");
             entity.Property(x => x.ModelCallsJson).HasColumnType("nvarchar(max)");
+            entity.Property(x => x.ClientIpAddress).HasMaxLength(45);
+            entity.Property(x => x.UserAgent).HasMaxLength(1000);
+            entity.Property(x => x.BrowserName).HasMaxLength(40);
+            entity.Property(x => x.OperatingSystem).HasMaxLength(40);
+            entity.Property(x => x.RequestPath).HasMaxLength(512);
+            entity.Property(x => x.HttpMethod).HasMaxLength(10);
+            entity.Property(x => x.TraceIdentifier).HasMaxLength(64);
             entity.HasIndex(x => x.StartedAtLocal);
         });
     }

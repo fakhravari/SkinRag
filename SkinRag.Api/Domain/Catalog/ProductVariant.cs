@@ -1,9 +1,9 @@
-namespace SkinRag.Api.Domain.Catalog;
+﻿namespace SkinRag.Api.Domain.Catalog;
 
 public sealed class ProductVariant
 {
     public int Id { get; set; }
-    public int ProductId { get; set; }
+    public int IdProduct { get; set; }
     public string Sku { get; set; } = "";
     public string Name { get; set; } = "";
     public decimal SizeValue { get; set; }

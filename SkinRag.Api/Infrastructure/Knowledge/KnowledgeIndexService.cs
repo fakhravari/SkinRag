@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -60,7 +60,7 @@ public sealed class KnowledgeIndexService(
                 .ToListAsync(cancellationToken);
             Volatile.Write(ref _total, products.Count);
             var cache = await db.ProductEmbeddings.Where(e => e.Model == ollama.EmbeddingModel)
-                .ToDictionaryAsync(e => e.ProductId, cancellationToken);
+                .ToDictionaryAsync(e => e.IdProduct, cancellationToken);
             var prefix = configuration["Rag:DocumentPrefix"] ?? "search_document: ";
             var version = configuration["Rag:EmbeddingVersion"] ?? DefaultEmbeddingVersion;
             var next = new Dictionary<int, KnowledgeDocument>();
@@ -95,7 +95,7 @@ public sealed class KnowledgeIndexService(
                     {
                         record = new ProductEmbedding
                         {
-                            ProductId = item.Product.Id,
+                            IdProduct = item.Product.Id,
                             Model = ollama.EmbeddingModel
                         };
                         db.ProductEmbeddings.Add(record);
@@ -167,9 +167,9 @@ public sealed class KnowledgeIndexService(
                 Domain: {p.CategoryDetails?.Domain}; Category: {p.CategoryDetails?.Name ?? p.Category}
                 Brand: {p.BrandDetails?.Name ?? p.Brand}
                 Skin types: {p.SkinTypes}; Hair types: {p.HairTypes}
-                Profiles: {string.Join(", ", p.ProductProfiles.OrderBy(x => x.ProfileId).Select(x => x.Profile.Name))}
+                Profiles: {string.Join(", ", p.ProductProfiles.OrderBy(x => x.IdCatalogProfile).Select(x => x.CatalogProfile.Name))}
                 Concerns: {p.Concerns}
-                Search terms: {p.SearchKeywords} {string.Join(" ", p.ProductConcerns.OrderBy(x => x.ConcernId).Select(x => x.Concern.SearchTerms))}
+                Search terms: {p.SearchKeywords} {string.Join(" ", p.ProductConcerns.OrderBy(x => x.IdConcern).Select(x => x.Concern.SearchTerms))}
                 Ingredients: {p.Ingredients}
                 Fragrance free declared: {(p.FragranceFreeKnown ? p.FragranceFree.ToString() : "unknown")}
                 Description: {p.Description}
