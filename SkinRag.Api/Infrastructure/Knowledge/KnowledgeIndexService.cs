@@ -19,7 +19,7 @@ public sealed class KnowledgeIndexService(
     IConfiguration configuration,
     ILogger<KnowledgeIndexService> logger) : IKnowledgeIndex
 {
-    private const string DefaultEmbeddingVersion = "catalog-v4";
+    private const string DefaultEmbeddingVersion = "bge-m3-v1";
     private string EmbeddingModel => configuration["Ollama:EmbeddingModel"] ?? "bge-m3";
     private readonly SemaphoreSlim _gate = new(1, 1);
     private int _isRebuilding, _processed, _total, _cached;
@@ -64,7 +64,7 @@ public sealed class KnowledgeIndexService(
             Volatile.Write(ref _total, products.Count);
             var cache = await db.ProductEmbeddings.Where(e => e.Model == EmbeddingModel)
                 .ToDictionaryAsync(e => e.IdProduct, cancellationToken);
-            var prefix = configuration["Rag:DocumentPrefix"] ?? "search_document: ";
+            var prefix = configuration["Rag:DocumentPrefix"] ?? "";
             var version = configuration["Rag:EmbeddingVersion"] ?? DefaultEmbeddingVersion;
             var next = new Dictionary<int, KnowledgeDocument>();
             var pending = new List<(Product Product, string Content, string Hash)>();

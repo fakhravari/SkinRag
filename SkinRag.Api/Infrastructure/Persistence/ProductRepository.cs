@@ -43,7 +43,7 @@ public sealed class ProductRepository(IDbContextFactory<SkinRagDbContext> factor
         await using var db = await factory.CreateDbContextAsync(ct);
         await CatalogQueryService.ValidateFiltersAsync(db, plan.Filters, ct);
         var scope = await CatalogQueryService.ResolveCategoryScopeAsync(db, plan.Filters, ct);
-        return await Query(db, plan, scope).Select(p => p.Id).ToArrayAsync(ct);
+        return await Query(db, plan, scope, await ConcernNamesAsync(db, plan, ct)).Select(p => p.Id).ToArrayAsync(ct);
     }
 
     public async Task<IReadOnlyList<ProductDto>> LoadAsync(IEnumerable<int> ids, SearchPlan plan, CancellationToken ct)
@@ -52,17 +52,37 @@ public sealed class ProductRepository(IDbContextFactory<SkinRagDbContext> factor
         await using var db = await factory.CreateDbContextAsync(ct);
         await CatalogQueryService.ValidateFiltersAsync(db, plan.Filters, ct);
         var scope = await CatalogQueryService.ResolveCategoryScopeAsync(db, plan.Filters, ct);
-        var rows = await CatalogQueryService.Hydrate(Query(db, plan, scope).Where(p => selected.Contains(p.Id)))
+        var rows = await CatalogQueryService.Hydrate(Query(db, plan, scope, await ConcernNamesAsync(db, plan, ct)).Where(p => selected.Contains(p.Id)))
             .ToListAsync(ct);
         return rows.Select(p => CatalogQueryService.ToDto(p, plan.Filters, plan.InStockOnly)).ToArray();
     }
 
-    private static IQueryable<Product> Query(SkinRagDbContext db, SearchPlan plan, CategoryScope? scope)
+    private static async Task<Dictionary<string, string>> ConcernNamesAsync(SkinRagDbContext db, SearchPlan plan,
+        CancellationToken ct)
+    {
+        if (plan.ConcernSlugs.Length == 0)
+        {
+            return [];
+        }
+
+        return await db.Concerns.AsNoTracking().Where(x => plan.ConcernSlugs.Contains(x.Slug))
+            .ToDictionaryAsync(x => x.Slug, x => x.Name, ct);
+    }
+
+    private static IQueryable<Product> Query(SkinRagDbContext db, SearchPlan plan, CategoryScope? scope,
+        IReadOnlyDictionary<string, string> concernNames)
     {
         var query = CatalogQueryService.Filter(db.Products.AsNoTracking(), plan.Filters, plan.InStockOnly, scope);
         foreach (var slug in plan.ConcernSlugs)
         {
-            query = query.Where(p => p.ProductConcerns.Any(x => x.Concern.Slug == slug));
+            // Concern links are optional data: a product without any link stays searchable
+            // and is matched by its descriptive text instead of being dropped.
+            var name = concernNames.GetValueOrDefault(slug);
+            query = string.IsNullOrWhiteSpace(name)
+                ? query.Where(p => p.ProductConcerns.Any(x => x.Concern.Slug == slug))
+                : query.Where(p => p.ProductConcerns.Any(x => x.Concern.Slug == slug)
+                                   || (!p.ProductConcerns.Any()
+                                       && (p.Concerns.Contains(name) || p.SearchKeywords.Contains(name))));
         }
 
         if (plan.ProductIds.Length > 0)

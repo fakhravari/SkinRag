@@ -53,7 +53,7 @@ public sealed class ProductRetriever(
         }
 
         var embeddingTimer = Stopwatch.StartNew();
-        var embeddingText = (configuration["Rag:QueryPrefix"] ?? "search_query: ") + plan.Query;
+        var embeddingText = (configuration["Rag:QueryPrefix"] ?? "") + plan.Query;
         var vector = (await embeddingGenerator.GenerateVectorsAsync([embeddingText],
             configuration["Ollama:EmbeddingModel"] ?? "bge-m3", ct))[0];
         embeddingTimer.Stop();
