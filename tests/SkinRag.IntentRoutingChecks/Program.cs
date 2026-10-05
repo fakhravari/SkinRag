@@ -55,7 +55,16 @@ var productRequest = await classifier.ClassifyAsync("پوست چرب چیست و
 Check(productRequest.Intent == ConsultationIntent.ProductSearch && chatClient.IntentCalls == 0,
     "An explicit product request was blocked by the definition-question guard.");
 
-Console.WriteLine("10 text matching and intent routing checks passed.");
+chatClient.IntentCalls = 0;
+var curlyHairRequest = await classifier.ClassifyAsync("برای موی فر و وز، کرم مو می‌خواهم", context, default);
+Check(curlyHairRequest.Intent == ConsultationIntent.ProductSearch && chatClient.IntentCalls == 0,
+    "A mapped curly-hair purchase request did not route to product search.");
+
+chatClient.IntentCalls = 0;
+var pinkMatteLipstick = await classifier.ClassifyAsync("یک رژ لب صورتی با جلوه مات می‌خواهم", context, default);
+Check(pinkMatteLipstick.Intent == ConsultationIntent.ProductSearch && chatClient.IntentCalls == 0,
+    "A lipstick purchase with variant attributes did not route to product search.");
+Console.WriteLine("12 text matching and intent routing checks passed.");
 
 static void Check(bool condition, string message)
 {
@@ -99,9 +108,14 @@ sealed class ProbeRepository : IProductRepository
     [
         new() { Phrase = "پوستم چربه", SearchTerms = "پوست چرب", MappingStatus = "Product", IsActive = true,
             Concern = new Concern { Name = "چربی پوست", SearchTerms = "پوستم چربه", Domain = "skin", Slug = "oily-skin" } },
-        new() { Phrase = "ریزش مو", SearchTerms = "کم پشتی مو", MappingStatus = "DefinitionOnly", Definition = "کم پشتی و ریزش مو", IsActive = true }
+        new() { Phrase = "ریزش مو", SearchTerms = "کم پشتی مو", MappingStatus = "DefinitionOnly", Definition = "کم پشتی و ریزش مو", IsActive = true },
+        new() { Phrase = "موی فر", IdCatalogProfile = 10, MappingStatus = "Product", IsActive = true,
+            CatalogProfile = new CatalogProfile { Id = 10, Name = "فر و مجعد", Kind = "hair", Slug = "hair-curly" } },
+        new() { Phrase = "رژ لب", IdCategory = 42, MappingStatus = "Product", IsActive = true,
+            Category = new Category { Id = 42, Name = "رژ لب", Domain = "beauty", Slug = "lipstick" } },
+        new() { Phrase = "رژ لب صورتی", MappingStatus = "DefinitionOnly", Definition = "رژ لب صورتی", IsActive = true },
+        new() { Phrase = "جلوه مات", MappingStatus = "DefinitionOnly", Definition = "جلوه مات", IsActive = true }
     ];
-
     public Task<IReadOnlyList<CatalogPhrase>> IntentPhrasesAsync(CancellationToken ct) => Task.FromResult(Phrases);
     public Task<CatalogVocabulary> VocabularyAsync(CancellationToken ct) => throw new NotSupportedException();
     public Task<int[]> EligibleIdsAsync(SearchPlan plan, CancellationToken ct) => throw new NotSupportedException();

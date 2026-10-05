@@ -31,8 +31,9 @@ public sealed class ProductRepository(IDbContextFactory<SkinRagDbContext> factor
     public async Task<IReadOnlyList<CatalogPhrase>> IntentPhrasesAsync(CancellationToken ct)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
-        return await db.CatalogPhrases.AsNoTracking().Include(x => x.Concern)
-            .Where(x => x.IsActive && (x.MappingStatus == CatalogPhraseStatus.DefinitionOnly || x.IdConcern != null))
+        return await db.CatalogPhrases.AsNoTracking().Include(x => x.Category).Include(x => x.Concern)
+            .Include(x => x.CatalogProfile)
+            .Where(x => x.IsActive)
             .OrderByDescending(x => x.Priority).ThenBy(x => x.Id)
             .ToArrayAsync(ct);
     }

@@ -9,15 +9,10 @@ internal static class ConsultationIntentRules
     private static readonly string[] ProductRequests =
     [
         "معرفی کن", "معرفی کنید", "معرفی میکنی", "پیشنهاد بده", "پیشنهاد بدید", "پیشنهاد کن",
-        "پیشنهاد میدی", "چی بخرم", "چی بگیرم", "دنبال محصول", "میخوام محصول", "میخوام کرم",
-        "میخوام شامپو", "محصول میخوام", "محصول میخواهم", "بخرم", "میخوام", "میخواهم"
+        "پیشنهاد میدی", "چی بخرم", "چی بگیرم", "دنبال محصول", "بخرم", "بگیرم", "می خواهم", "می خوام"
     ];
-
     private static readonly string[] InformationalRequests =
     ["قیمت", "چنده", "موجود", "ترکیبات", "مواد تشکیل دهنده", "روش مصرف", "چرا", "علت", "دلیل"];
-
-    private static readonly string[] ProductTerms =
-    ["کرم", "مرطوب کننده", "آبرسان", "سرم", "شامپو", "محصول", "ضد آفتاب", "رژ", "ماسک"];
 
     private static readonly string[] ProductReferences =
     ["این", "اون", "همین", "اولی", "دومی", "سومی", "قبلی", "قیمتش", "ترکیباتش"];
@@ -29,13 +24,7 @@ internal static class ConsultationIntentRules
         IntentContext context)
     {
         var normalized = PersianText.Normalize(message);
-        string[] genericWants = ["می خواهم", "می خوام", "میخواهم", "میخوام"];
-        var hasSpecificRequestPhrase = ContainsAny(normalized, ProductRequests.Where(phrase =>
-            !genericWants.Contains(PersianText.Normalize(phrase), StringComparer.Ordinal)));
-        var wantsSpecificProduct = ContainsAny(normalized, genericWants)
-                                   && ContainsAny(normalized, ProductTerms)
-                                   && !ContainsAny(normalized, DefinitionRequests);
-        var isExplicitProductRequest = (hasSpecificRequestPhrase || wantsSpecificProduct)
+        var isExplicitProductRequest = ContainsAny(normalized, ProductRequests)
                                        && !ContainsAny(normalized, InformationalRequests);
 
         var matchedDefinitions = CatalogPhraseMatcher.FindDefinitionOnlyMappings(message, phrases,
@@ -51,7 +40,7 @@ internal static class ConsultationIntentRules
             return new IntentDecision(ConsultationIntent.Unclear, 1, "definition-only-catalog-phrase");
         }
 
-        if (isExplicitProductRequest && ContainsAny(normalized, ProductTerms))
+        if (isExplicitProductRequest && matchedProductPhrases.Length > 0)
         {
             return new IntentDecision(ConsultationIntent.ProductSearch, 1, "catalog-product-request-rule");
         }
