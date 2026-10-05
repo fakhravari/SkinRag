@@ -132,10 +132,12 @@ public sealed class SkinRagDbContext(DbContextOptions<SkinRagDbContext> options)
             entity.Property(x => x.Outcome).HasMaxLength(20).IsRequired();
             entity.Property(x => x.ErrorType).HasMaxLength(200);
             entity.Property(x => x.Intent).HasMaxLength(40);
+            entity.Property(x => x.IntentSource).HasMaxLength(100);
             entity.Property(x => x.RetrievalMethod).HasMaxLength(60);
             entity.Property(x => x.ResponseMode).HasMaxLength(30);
             entity.Property(x => x.QuerySource).HasMaxLength(500);
             entity.Property(x => x.SearchQuery).HasColumnType("nvarchar(max)");
+            entity.Property(x => x.RetrievalDiagnosticsJson).HasColumnType("nvarchar(max)");
             entity.Property(x => x.ModelCallsJson).HasColumnType("nvarchar(max)");
             entity.Property(x => x.ClientIpAddress).HasMaxLength(45);
             entity.Property(x => x.UserAgent).HasMaxLength(1000);

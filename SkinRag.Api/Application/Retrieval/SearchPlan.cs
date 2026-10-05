@@ -33,7 +33,8 @@ public sealed record RetrievalResult(
     string Method,
     double SqlFilterMs = 0,
     double EmbeddingMs = 0,
-    double ProductLoadMs = 0);
+    double ProductLoadMs = 0,
+    int[]? EligibleProductIds = null);
 
 public interface IProductRetriever
 {

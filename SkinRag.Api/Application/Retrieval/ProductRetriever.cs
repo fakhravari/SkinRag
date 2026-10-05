@@ -11,17 +11,21 @@ public sealed class ProductRetriever(
     IProductRepository repository,
     IKnowledgeIndex index,
     IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
-    IConfiguration configuration) : IProductRetriever
+    IConfiguration configuration,
+    ILogger<ProductRetriever> logger) : IProductRetriever
 {
     public async Task<RetrievalResult> RetrieveAsync(SearchPlan plan, CancellationToken ct)
     {
+        var hasVariantConstraint = HasVariantConstraint(plan.Filters);
         var sqlTimer = Stopwatch.StartNew();
         var eligible = await repository.EligibleIdsAsync(plan, ct);
         sqlTimer.Stop();
         var sqlFilterMs = sqlTimer.Elapsed.TotalMilliseconds;
         if (eligible.Length == 0)
         {
-            return new RetrievalResult([], 0, index.Snapshot().UpdatedAtUtc, "sql-filters", sqlFilterMs);
+            LogVariantRetrieval(plan, hasVariantConstraint, [], []);
+            return new RetrievalResult([], 0, index.Snapshot().UpdatedAtUtc, "sql-filters", sqlFilterMs,
+                EligibleProductIds: []);
         }
 
         if (plan.ProductIds.Length > 0)
@@ -36,7 +40,8 @@ public sealed class ProductRetriever(
                 null,
                 "sql-product-reference",
                 sqlFilterMs,
-                ProductLoadMs: directLoadTimer.Elapsed.TotalMilliseconds);
+                ProductLoadMs: directLoadTimer.Elapsed.TotalMilliseconds,
+                EligibleProductIds: eligible);
         }
 
         var snapshot = index.Snapshot();
@@ -49,7 +54,9 @@ public sealed class ProductRetriever(
         var candidates = snapshot.Documents.Where(d => eligibleSet.Contains(d.ProductId)).ToArray();
         if (candidates.Length == 0)
         {
-            return new RetrievalResult([], eligible.Length, snapshot.UpdatedAtUtc, "hybrid-vector-lexical");
+            LogVariantRetrieval(plan, hasVariantConstraint, eligible, []);
+            return new RetrievalResult([], eligible.Length, snapshot.UpdatedAtUtc, "hybrid-vector-lexical",
+                EligibleProductIds: eligible);
         }
 
         var embeddingTimer = Stopwatch.StartNew();
@@ -71,14 +78,24 @@ public sealed class ProductRetriever(
                 Document = d,
                 Similarity = Cosine(vector, d.Embedding, norm, d.VectorNorm)
             })
-            .Where(x => x.Similarity >= minimum)
+            // An exact SQL shade/finish filter is stronger evidence than the
+            // embedding score. Keep every exact variant candidate for ranking.
+            .Where(x => hasVariantConstraint || x.Similarity >= minimum)
             .Select(x => new
             {
                 Id = x.Document.ProductId,
                 x.Similarity,
-                Score = .8 * x.Similarity + .2 * (tokens.Count == 0
+                LexicalScore = tokens.Count == 0
                     ? 0
-                    : (double)tokens.Count(x.Document.Tokens.Contains) / tokens.Count)
+                    : (double)tokens.Count(x.Document.Tokens.Contains) / tokens.Count
+            })
+            .Select(x => new
+            {
+                x.Id,
+                x.Similarity,
+                Score = hasVariantConstraint
+                    ? .55 * x.Similarity + .45 * x.LexicalScore
+                    : .8 * x.Similarity + .2 * x.LexicalScore
             })
             .OrderByDescending(x => x.Score)
             .ThenBy(x => x.Id)
@@ -91,14 +108,43 @@ public sealed class ProductRetriever(
         var matches = ranked.Where(x => live.ContainsKey(x.Id)).Select(x =>
             new ProductMatch(live[x.Id], Math.Round(x.Similarity, 4), Math.Round(x.Score, 4)));
         matches = plan.PreferBudget ? matches.OrderBy(x => x.Product.Price).ThenByDescending(x => x.Score) : matches;
+        var selectedMatches = matches.Take(topK).ToArray();
+        LogVariantRetrieval(plan, hasVariantConstraint, eligible, selectedMatches.Select(x => x.Product.Id).ToArray());
         return new RetrievalResult(
-            matches.Take(topK).ToArray(),
+            selectedMatches,
             eligible.Length,
             snapshot.UpdatedAtUtc,
             "hybrid-vector-lexical",
             sqlFilterMs,
             embeddingTimer.Elapsed.TotalMilliseconds,
-            loadTimer.Elapsed.TotalMilliseconds);
+            loadTimer.Elapsed.TotalMilliseconds,
+            eligible);
+    }
+
+    private static bool HasVariantConstraint(CatalogFilters filters) =>
+        !string.IsNullOrWhiteSpace(filters.Shade)
+        || (filters.Shades?.Any(x => !string.IsNullOrWhiteSpace(x)) ?? false)
+        || !string.IsNullOrWhiteSpace(filters.Finish)
+        || (filters.Finishes?.Any(x => !string.IsNullOrWhiteSpace(x)) ?? false);
+
+    private void LogVariantRetrieval(SearchPlan plan, bool hasVariantConstraint, int[] eligibleIds,
+        int[] returnedIds)
+    {
+        if (!hasVariantConstraint)
+        {
+            return;
+        }
+
+        logger.LogInformation(
+            "Exact variant retrieval for {CategorySlug}: shade {Shade}/{Shades}, finish {Finish}/{Finishes}; " +
+            "eligible product IDs {EligibleProductIds}; returned product IDs {ReturnedProductIds}",
+            plan.Filters.CategorySlug,
+            plan.Filters.Shade,
+            plan.Filters.Shades,
+            plan.Filters.Finish,
+            plan.Filters.Finishes,
+            eligibleIds,
+            returnedIds);
     }
 
     public static double Cosine(float[] a, float[] b, double normA, double normB)

@@ -76,22 +76,7 @@ internal static class ConsultationIntentRules
 
     private static bool MatchesForIntent(string message, CatalogPhrase phrase)
     {
-        if (CatalogPhraseMatcher.Matches(message, phrase, includeSearchTerms: true))
-        {
-            return true;
-        }
-
-        // Customer wording often inserts color, finish, or filler words inside a
-        // catalog phrase (for example, "هایلایتر طلایی مات"). Keep the phrase's
-        // meaningful words together in the request even when they are not adjacent.
-        var phraseTokens = PersianText.SearchTokens(phrase.Phrase);
-        if (phraseTokens.Count < 2)
-        {
-            return false;
-        }
-
-        var messageTokens = PersianText.SearchTokens(message);
-        return phraseTokens.All(messageTokens.Contains);
+        return CatalogPhraseMatcher.MatchesFlexible(message, phrase, includeSearchTerms: true);
     }
 
     private static bool ContainsAny(string text, IEnumerable<string> phrases)

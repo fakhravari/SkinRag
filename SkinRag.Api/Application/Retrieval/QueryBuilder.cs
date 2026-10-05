@@ -565,7 +565,8 @@ public sealed partial class QueryBuilder(
             return phraseMatch.Domain;
         }
 
-        var mappedDomains = CatalogPhraseMatcher.FindProductMappings(text, catalogPhrases)
+        var mappedDomains = (catalogPhrases ?? []).Where(CatalogPhraseMatcher.IsProductMapping)
+            .Where(x => CatalogPhraseMatcher.MatchesFlexible(text, x, includeSearchTerms: true))
             .Select(x => new
             {
                 Domain = x.Category?.Domain ?? x.Concern?.Domain ?? x.CatalogProfile?.Kind,
@@ -650,7 +651,8 @@ public sealed partial class QueryBuilder(
         // from a different normalized domain into the match set.
         var candidates = all.Where(x => domain is null || x.Domain == domain).ToArray();
         var candidateIds = candidates.Select(x => x.Id).ToHashSet();
-        var phraseMatches = CatalogPhraseMatcher.FindProductMappings(text, catalogPhrases)
+        var phraseMatches = (catalogPhrases ?? []).Where(CatalogPhraseMatcher.IsProductMapping)
+            .Where(x => CatalogPhraseMatcher.MatchesFlexible(text, x, includeSearchTerms: true))
             .Where(x => x.IdCategory is { } categoryId && candidateIds.Contains(categoryId)
                         && x.Category is not null)
             .OrderByDescending(x => PersianText.SearchTokens(x.Phrase).Count)

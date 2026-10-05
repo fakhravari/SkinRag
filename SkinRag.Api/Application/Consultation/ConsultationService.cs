@@ -164,6 +164,7 @@ public sealed class ConsultationService(
             "Intent {Intent} ({Source}), confidence {Confidence:F2}, topic {Topic}, requires context {RequiresContext}",
             intent.Code, intent.Source, intent.Confidence, intent.ConversationTopic, intent.RequiresContext);
         timing.Intent = intent.Code;
+        timing.IntentSource = intent.Source;
 
         ConsultationResponse Direct(string answer, string mode, bool more = false, string? followUp = null,
             string? notice = null)
@@ -257,6 +258,21 @@ public sealed class ConsultationService(
         timing.SqlFilterMs = retrieval.SqlFilterMs;
         timing.EmbeddingMs = retrieval.EmbeddingMs;
         timing.ProductLoadMs = retrieval.ProductLoadMs;
+        timing.RetrievalDiagnosticsJson = JsonSerializer.Serialize(new
+        {
+            plan.Source,
+            plan.Filters.Domain,
+            plan.Filters.CategorySlug,
+            plan.Filters.Shade,
+            plan.Filters.Shades,
+            plan.Filters.Finish,
+            plan.Filters.Finishes,
+            plan.ConcernSlugs,
+            plan.InStockOnly,
+            retrieval.EligibleProducts,
+            EligibleProductIds = retrieval.EligibleProductIds ?? [],
+            ReturnedProductIds = retrieval.Products.Select(x => x.Product.Id).ToArray()
+        });
 
         ConsultationResponse Result(
             string answer,
