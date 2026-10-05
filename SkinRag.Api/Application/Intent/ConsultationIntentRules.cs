@@ -9,7 +9,8 @@ internal static class ConsultationIntentRules
     private static readonly string[] ProductRequests =
     [
         "معرفی کن", "معرفی کنید", "معرفی میکنی", "پیشنهاد بده", "پیشنهاد بدید", "پیشنهاد کن",
-        "پیشنهاد میدی", "چی بخرم", "چی بگیرم", "دنبال محصول", "بخرم", "بگیرم", "می خواهم", "می خوام"
+        "پیشنهاد میدی", "چی بخرم", "چی بگیرم", "دنبال محصول", "بخرم", "بگیرم", "نیاز دارم",
+        "می خواهم", "می خوام", "میخواهم", "میخوام"
     ];
     private static readonly string[] InformationalRequests =
     ["قیمت", "چنده", "موجود", "ترکیبات", "مواد تشکیل دهنده", "روش مصرف", "چرا", "علت", "دلیل"];
@@ -21,19 +22,24 @@ internal static class ConsultationIntentRules
     ["چیست", "چیه", "یعنی چه", "یعنی چی", "منظور از", "تعریف"];
 
     public static IntentDecision? Match(string message, IReadOnlyList<CatalogPhrase> phrases,
-        IntentContext context)
+        IntentContext context, out IntentRuleDiagnostics diagnostics)
     {
         var normalized = PersianText.Normalize(message);
         var isExplicitProductRequest = ContainsAny(normalized, ProductRequests)
                                        && !ContainsAny(normalized, InformationalRequests);
 
-        var matchedDefinitions = CatalogPhraseMatcher.FindDefinitionOnlyMappings(message, phrases,
-                includeSearchTerms: true)
+        var matchedDefinitions = phrases.Where(CatalogPhraseMatcher.IsDefinitionOnlyMapping)
+            .Where(phrase => MatchesForIntent(message, phrase))
             .ToArray();
-        var matchedProductPhrases = CatalogPhraseMatcher.FindProductMappings(message, phrases,
-                includeSearchTerms: true)
+        var matchedProductPhrases = phrases.Where(CatalogPhraseMatcher.IsProductMapping)
+            .Where(phrase => MatchesForIntent(message, phrase))
             .OrderByDescending(x => PersianText.SearchTokens(x.Phrase).Count)
             .ToArray();
+        diagnostics = new IntentRuleDiagnostics(
+            isExplicitProductRequest,
+            matchedProductPhrases.Length,
+            matchedDefinitions.Length,
+            matchedProductPhrases.FirstOrDefault()?.Phrase);
         var matched = matchedProductPhrases.Where(x => x.Concern is not null).ToArray();
         if (isExplicitProductRequest && matchedDefinitions.Length > 0 && matchedProductPhrases.Length == 0)
         {
@@ -68,9 +74,35 @@ internal static class ConsultationIntentRules
         return new IntentDecision(ConsultationIntent.SkinConsultation, 1, "catalog-concern-rule");
     }
 
+    private static bool MatchesForIntent(string message, CatalogPhrase phrase)
+    {
+        if (CatalogPhraseMatcher.Matches(message, phrase, includeSearchTerms: true))
+        {
+            return true;
+        }
+
+        // Customer wording often inserts color, finish, or filler words inside a
+        // catalog phrase (for example, "هایلایتر طلایی مات"). Keep the phrase's
+        // meaningful words together in the request even when they are not adjacent.
+        var phraseTokens = PersianText.SearchTokens(phrase.Phrase);
+        if (phraseTokens.Count < 2)
+        {
+            return false;
+        }
+
+        var messageTokens = PersianText.SearchTokens(message);
+        return phraseTokens.All(messageTokens.Contains);
+    }
+
     private static bool ContainsAny(string text, IEnumerable<string> phrases)
     {
         var padded = " " + text + " ";
         return phrases.Any(phrase => PersianText.ContainsPhrase(padded, phrase));
     }
 }
+
+internal sealed record IntentRuleDiagnostics(
+    bool HasExplicitProductRequest,
+    int MatchedProductPhraseCount,
+    int MatchedDefinitionPhraseCount,
+    string? BestMatchedProductPhrase);

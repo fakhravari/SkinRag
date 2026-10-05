@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
 using SkinRag.Api.Application.Abstractions;
@@ -12,7 +13,7 @@ public sealed partial class IntentClassifier(
     IChatClient chatClient,
     IConfiguration configuration,
     ILogger<IntentClassifier> logger,
-    IProductRepository? productRepository = null) : IIntentClassifier
+    IProductRepository productRepository) : IIntentClassifier
 {
     // Match product domains instead of maintaining a growing list of individual SKUs or categories.
     public Task<IntentDecision> ClassifyAsync(string message, IReadOnlyList<string> previousQuestions,
@@ -99,21 +100,36 @@ public sealed partial class IntentClassifier(
             };
         }
 
-        if (productRepository is not null)
+        var phraseReadTimer = Stopwatch.StartNew();
+        try
         {
-            try
+            var phrases = await productRepository.IntentPhrasesAsync(ct);
+            phraseReadTimer.Stop();
+            var ruleDecision = ConsultationIntentRules.Match(message, phrases, context, out var diagnostics);
+            if (ruleDecision is not null)
             {
-                var phrases = await productRepository.IntentPhrasesAsync(ct);
-                if (ConsultationIntentRules.Match(message, phrases, context) is { } ruleDecision)
-                {
-                    return ruleDecision;
-                }
+                logger.LogInformation(
+                    "Intent resolved by catalog rule {RuleSource}; matched {MatchedPhraseCount} product phrases",
+                    ruleDecision.Source, diagnostics.MatchedProductPhraseCount);
+                return ruleDecision;
             }
-            catch (Exception ex) when (!ct.IsCancellationRequested && ex is not OutOfMemoryException)
-            {
-                logger.LogWarning("Consultation concern lookup unavailable ({ErrorType}); using intent model",
-                    ex.GetType().Name);
-            }
+
+            logger.LogInformation(
+                "No catalog intent rule matched; using intent model. Product request {HasProductRequest}, " +
+                "product phrases {ProductPhraseCount}, definition phrases {DefinitionPhraseCount}, " +
+                "best phrase {BestMatchedProductPhrase}, catalog read {CatalogReadMs:F1} ms",
+                diagnostics.HasExplicitProductRequest,
+                diagnostics.MatchedProductPhraseCount,
+                diagnostics.MatchedDefinitionPhraseCount,
+                diagnostics.BestMatchedProductPhrase,
+                phraseReadTimer.Elapsed.TotalMilliseconds);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested && ex is not OutOfMemoryException)
+        {
+            phraseReadTimer.Stop();
+            logger.LogWarning(ex,
+                "Catalog intent lookup failed after {CatalogReadMs:F1} ms; using intent model",
+                phraseReadTimer.Elapsed.TotalMilliseconds);
         }
 
         try
