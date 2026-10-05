@@ -1,4 +1,5 @@
 ﻿using SkinRag.Api.Application.Common.Text;
+using SkinRag.Api.Application.Common.Catalog;
 using SkinRag.Api.Domain.Catalog;
 
 namespace SkinRag.Api.Application.Retrieval;
@@ -14,10 +15,10 @@ public static class CustomerLanguageQuery
     public static string AppendCatalogTerms(string catalogQuery, string customerMessage,
         IEnumerable<CatalogPhrase>? mappings)
     {
-        var query = PersianText.Normalize(catalogQuery);
+        var query = PersianText.NormalizeForMatch(catalogQuery);
         var additions = MatchingTerms(customerMessage, mappings)
             .Where(term => string.IsNullOrWhiteSpace(query)
-                           || !query.Contains(PersianText.Normalize(term), StringComparison.Ordinal));
+                           || !PersianText.ContainsPhrase(query, term));
         return string.Join(' ',
             new[] { catalogQuery, string.Join(' ', additions) }.Where(x => !string.IsNullOrWhiteSpace(x))).Trim();
     }
@@ -25,11 +26,8 @@ public static class CustomerLanguageQuery
     private static IEnumerable<string> MatchingTerms(string customerMessage,
         IEnumerable<CatalogPhrase>? mappings)
     {
-        var text = PersianText.Normalize(customerMessage);
-        return (mappings ?? [])
-            .Where(mapping => mapping.IsActive
-                              && mapping.SearchTerms is not null
-                              && text.Contains(PersianText.Normalize(mapping.Phrase), StringComparison.Ordinal))
+        return CatalogPhraseMatcher.FindProductMappings(customerMessage, mappings)
+            .Where(mapping => mapping.SearchTerms is not null)
             .Select(mapping => mapping.SearchTerms!)
             .Where(terms => !string.IsNullOrWhiteSpace(terms))
             .Distinct(StringComparer.Ordinal);

@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
+using OllamaSharp;
 using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Consultation;
 using SkinRag.Api.Application.Intent;
@@ -51,8 +53,15 @@ public static class ServiceCollectionExtensions
                 client.BaseAddress = new Uri(configuration["Ollama:BaseUrl"] ?? "http://localhost:11434");
                 client.Timeout = TimeSpan.FromSeconds(configuration.GetValue("Ollama:RequestTimeoutSeconds", 300));
             });
-        services.AddSingleton<OllamaClient>();
-        services.AddSingleton<IOllamaClient>(provider => provider.GetRequiredService<OllamaClient>());
+        services.AddSingleton<IChatClient>(provider => new OllamaTelemetryChatClient(
+            new OllamaApiClient(
+                provider.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama"),
+                configuration["Ollama:ChatModel"] ?? "qwen2.5:7b"),
+            provider.GetRequiredService<ILogger<OllamaTelemetryChatClient>>()));
+        services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(provider =>
+            new OllamaApiClient(
+                provider.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama"),
+                configuration["Ollama:EmbeddingModel"] ?? "bge-m3"));
         services.AddSingleton<KnowledgeIndexService>();
         services.AddSingleton<IKnowledgeIndex>(provider => provider.GetRequiredService<KnowledgeIndexService>());
         services.AddHostedService<KnowledgeIndexBackgroundService>();

@@ -8,7 +8,7 @@ public interface IProductRepository
 {
     Task<CatalogVocabulary> VocabularyAsync(CancellationToken ct);
 
-    Task<IReadOnlyList<Concern>> IntentConcernsAsync(CancellationToken ct);
+    Task<IReadOnlyList<CatalogPhrase>> IntentPhrasesAsync(CancellationToken ct);
     Task<int[]> EligibleIdsAsync(SearchPlan plan, CancellationToken ct);
     Task<IReadOnlyList<ProductDto>> LoadAsync(IEnumerable<int> ids, SearchPlan plan, CancellationToken ct);
 }

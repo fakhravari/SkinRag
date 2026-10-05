@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
+using Microsoft.Extensions.AI;
 using SkinRag.Api.Application.Abstractions;
+using SkinRag.Api.Application.Common.AI;
 using SkinRag.Api.Application.Common.Text;
 using SkinRag.Api.Application.Contracts.Catalog;
 using SkinRag.Api.Application.Contracts.Consultation;
@@ -20,7 +22,7 @@ public sealed class ConsultationService(
     IQueryBuilder queryBuilder,
     IProductRepository repository,
     IProductRetriever retriever,
-    IOllamaClient ollama,
+    IChatClient chatClient,
     RecommendationValidator validator,
     ConversationStore conversations,
     IConsultationPerformanceSink performanceSink,
@@ -151,6 +153,7 @@ public sealed class ConsultationService(
                 : classifier.ClassifyAsync(message, intentContext, ct),
             elapsed => timing.IntentMs = elapsed);
         if (intent.Intent == ConsultationIntent.Unclear
+            && intent.Source != "definition-only-catalog-phrase"
             && HasCatalogSelection(request)
             && IsRecommendationRequest(message))
         {
@@ -401,7 +404,8 @@ public sealed class ConsultationService(
     private async Task<ConsultationResult> GenerateAnswerAsync(string message, IntentDecision intent,
         IReadOnlyList<ProductMatch> context, CancellationToken ct)
     {
-        return await ollama.ChatStructuredAsync<ConsultationResult>(PipelinePrompts.Consultation,
+        return await StructuredChatCompletion.GetAsync<ConsultationResult>(chatClient, configuration,
+            PipelinePrompts.Consultation,
             new
             {
                 message,

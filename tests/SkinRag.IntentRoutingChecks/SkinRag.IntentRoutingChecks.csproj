@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../SkinRag.Api/SkinRag.Api.csproj" />
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.10.0" />
   </ItemGroup>
 </Project>

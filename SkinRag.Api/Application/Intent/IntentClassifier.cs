@@ -1,5 +1,7 @@
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.AI;
 using SkinRag.Api.Application.Abstractions;
+using SkinRag.Api.Application.Common.AI;
 using SkinRag.Api.Application.Common.Text;
 using SkinRag.Api.Application.Parsing;
 using SkinRag.Api.Application.Prompts;
@@ -7,7 +9,7 @@ using SkinRag.Api.Application.Prompts;
 namespace SkinRag.Api.Application.Intent;
 
 public sealed partial class IntentClassifier(
-    IOllamaClient ollama,
+    IChatClient chatClient,
     IConfiguration configuration,
     ILogger<IntentClassifier> logger,
     IProductRepository? productRepository = null) : IIntentClassifier
@@ -101,8 +103,8 @@ public sealed partial class IntentClassifier(
         {
             try
             {
-                var concerns = await productRepository.IntentConcernsAsync(ct);
-                if (ConsultationIntentRules.Match(message, concerns, context) is { } ruleDecision)
+                var phrases = await productRepository.IntentPhrasesAsync(ct);
+                if (ConsultationIntentRules.Match(message, phrases, context) is { } ruleDecision)
                 {
                     return ruleDecision;
                 }
@@ -116,7 +118,9 @@ public sealed partial class IntentClassifier(
 
         try
         {
-            var output = await ollama.ChatStructuredAsync<IntentModelOutput>(
+            var output = await StructuredChatCompletion.GetAsync<IntentModelOutput>(
+                chatClient,
+                configuration,
                 PipelinePrompts.Intent,
                 new
                 {
@@ -231,6 +235,6 @@ public sealed partial class IntentClassifier(
 
     private static bool Has(string text, params string[] phrases)
     {
-        return phrases.Any(p => (" " + text + " ").Contains(" " + p + " ", StringComparison.Ordinal));
+        return phrases.Any(p => PersianText.ContainsPhrase(text, p));
     }
 }

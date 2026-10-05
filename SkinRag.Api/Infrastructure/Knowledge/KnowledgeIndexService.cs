@@ -1,8 +1,10 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.AI;
 using Microsoft.EntityFrameworkCore;
 using SkinRag.Api.Application.Abstractions;
+using SkinRag.Api.Application.Common.AI;
 using SkinRag.Api.Application.Knowledge;
 using SkinRag.Api.Domain.Catalog;
 using SkinRag.Api.Infrastructure.Catalog;
@@ -13,11 +15,12 @@ namespace SkinRag.Api.Infrastructure.Knowledge;
 
 public sealed class KnowledgeIndexService(
     IDbContextFactory<SkinRagDbContext> dbFactory,
-    IOllamaClient ollama,
+    IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
     IConfiguration configuration,
     ILogger<KnowledgeIndexService> logger) : IKnowledgeIndex
 {
     private const string DefaultEmbeddingVersion = "catalog-v4";
+    private string EmbeddingModel => configuration["Ollama:EmbeddingModel"] ?? "bge-m3";
     private readonly SemaphoreSlim _gate = new(1, 1);
     private int _isRebuilding, _processed, _total, _cached;
     private string? _lastError;
@@ -39,7 +42,7 @@ public sealed class KnowledgeIndexService(
             Volatile.Read(ref _processed),
             Volatile.Read(ref _total),
             Volatile.Read(ref _cached),
-            ollama.EmbeddingModel,
+            EmbeddingModel,
             configuration["Rag:EmbeddingVersion"] ?? DefaultEmbeddingVersion,
             configuration["Ollama:ChatModel"] ?? "",
             Volatile.Read(ref _lastError));
@@ -59,7 +62,7 @@ public sealed class KnowledgeIndexService(
                 .Hydrate(db.Products.AsNoTracking().Where(p => p.IsActive).OrderBy(p => p.Id))
                 .ToListAsync(cancellationToken);
             Volatile.Write(ref _total, products.Count);
-            var cache = await db.ProductEmbeddings.Where(e => e.Model == ollama.EmbeddingModel)
+            var cache = await db.ProductEmbeddings.Where(e => e.Model == EmbeddingModel)
                 .ToDictionaryAsync(e => e.IdProduct, cancellationToken);
             var prefix = configuration["Rag:DocumentPrefix"] ?? "search_document: ";
             var version = configuration["Rag:EmbeddingVersion"] ?? DefaultEmbeddingVersion;
@@ -86,8 +89,8 @@ public sealed class KnowledgeIndexService(
             var batchSize = Math.Clamp(configuration.GetValue("Rag:EmbeddingBatchSize", 16), 1, 64);
             foreach (var batch in pending.Chunk(batchSize))
             {
-                var embeddings = await ollama.EmbedBatchAsync(batch.Select(x => prefix + x.Content).ToArray(),
-                    cancellationToken);
+                var embeddings = await embeddingGenerator.GenerateVectorsAsync(
+                    batch.Select(x => prefix + x.Content).ToArray(), EmbeddingModel, cancellationToken);
                 for (var i = 0; i < batch.Length; i++)
                 {
                     var item = batch[i];
@@ -96,7 +99,7 @@ public sealed class KnowledgeIndexService(
                         record = new ProductEmbedding
                         {
                             IdProduct = item.Product.Id,
-                            Model = ollama.EmbeddingModel
+                            Model = EmbeddingModel
                         };
                         db.ProductEmbeddings.Add(record);
                         cache[item.Product.Id] = record;

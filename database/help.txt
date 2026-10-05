@@ -4,14 +4,21 @@ set OLLAMA_CONTEXT_LENGTH=2048
 "C:\Ollama\ollama.exe" serve
 
 
+ollama pull bge-m3 
+
+cd folder > ollama create bge-m3-local -f Modelfile
 
 C:\Ollama\ollama.exe serve
 C:\Ollama\ollama.exe list
 
-C:\Ollama\ollama.exe pull qwen2.5:7b && C:\Ollama\ollama.exe pull qwen2.5:3b && C:\Ollama\ollama.exe pull nomic-embed-text
+ollama pull bge-m3
+
+C:\Ollama\ollama.exe pull qwen2.5:7b && C:\Ollama\ollama.exe pull qwen2.5:3b && C:\Ollama\ollama.exe pull bge-m3
 
 
-ollama pull qwen2.5:7b && ollama pull qwen2.5:3b && ollama pull nomic-embed-text
+C:\Ollama\ollama.exe pull bge-m3 
+
+ollama pull qwen2.5:7b && ollama pull qwen2.5:3b && ollama pull bge-m3
 
 
 folder to cmd 

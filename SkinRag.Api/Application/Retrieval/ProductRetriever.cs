@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using Microsoft.Extensions.AI;
 using SkinRag.Api.Application.Abstractions;
+using SkinRag.Api.Application.Common.AI;
 using SkinRag.Api.Application.Common.Text;
 using SkinRag.Api.Application.Contracts.Catalog;
 
@@ -8,7 +10,7 @@ namespace SkinRag.Api.Application.Retrieval;
 public sealed class ProductRetriever(
     IProductRepository repository,
     IKnowledgeIndex index,
-    IOllamaClient ollama,
+    IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
     IConfiguration configuration) : IProductRetriever
 {
     public async Task<RetrievalResult> RetrieveAsync(SearchPlan plan, CancellationToken ct)
@@ -51,7 +53,9 @@ public sealed class ProductRetriever(
         }
 
         var embeddingTimer = Stopwatch.StartNew();
-        var vector = await ollama.EmbedAsync((configuration["Rag:QueryPrefix"] ?? "search_query: ") + plan.Query, ct);
+        var embeddingText = (configuration["Rag:QueryPrefix"] ?? "search_query: ") + plan.Query;
+        var vector = (await embeddingGenerator.GenerateVectorsAsync([embeddingText],
+            configuration["Ollama:EmbeddingModel"] ?? "bge-m3", ct))[0];
         embeddingTimer.Stop();
         if (candidates.Any(d => d.Embedding.Length != vector.Length))
         {

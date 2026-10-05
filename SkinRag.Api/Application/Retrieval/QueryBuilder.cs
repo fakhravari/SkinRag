@@ -1,7 +1,10 @@
 ﻿using System.Globalization;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.AI;
 using SkinRag.Api.Application.Abstractions;
+using SkinRag.Api.Application.Common.AI;
 using SkinRag.Api.Application.Common.Text;
+using SkinRag.Api.Application.Common.Catalog;
 using SkinRag.Api.Application.Consultation;
 using SkinRag.Api.Application.Contracts.Catalog;
 using SkinRag.Api.Application.Contracts.Consultation;
@@ -14,7 +17,7 @@ using SkinRag.Api.Domain.Catalog;
 namespace SkinRag.Api.Application.Retrieval;
 
 public sealed partial class QueryBuilder(
-    IOllamaClient ollama,
+    IChatClient chatClient,
     IConfiguration configuration,
     ILogger<QueryBuilder> logger) : IQueryBuilder
 {
@@ -240,6 +243,7 @@ public sealed partial class QueryBuilder(
         }
 
         var filters = MergeFilters(request, parsed, decision, conversation, vocabulary, writtenBudget);
+        ApplyPhraseProfile(filters, message, vocabulary.CatalogPhrases);
         if (filters.SizeValue is null && explicitSize is not null)
         {
             filters.SizeValue = explicitSize.Value;
@@ -255,12 +259,17 @@ public sealed partial class QueryBuilder(
             filters.MinPrice ??= conversation.PendingMinimumBudgetRials;
         }
 
+        var mappedConcerns = CatalogPhraseMatcher.FindProductMappings(message, vocabulary.CatalogPhrases)
+            .Where(x => x.IdConcern is not null)
+            .Select(x => x.Concern?.Slug)
+            .Where(x => x is not null)
+            .Cast<string>();
         var concerns = request.ConcernSlug is not null
             ? new[]
             {
                 request.ConcernSlug
             }
-            : parsed.ConcernSlugs;
+            : parsed.ConcernSlugs.Concat(mappedConcerns).Distinct().ToArray();
         concerns = concerns.Where(s =>
                 vocabulary.Concerns.Any(c => c.Slug == s && (filters.Domain is null || c.Domain == filters.Domain)))
             .Distinct()
@@ -420,17 +429,21 @@ public sealed partial class QueryBuilder(
 
     private static bool HasAny(string text, params string[] values)
     {
-        return values.Any(s => (" " + text + " ").Contains(" " + s + " ", StringComparison.Ordinal));
+        return values.Any(value => PersianText.ContainsPhrase(text, value));
     }
 
     private static int LabelScore(string text, string label)
     {
-        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         string[] suffixes = ["", "ه", "م", "ها", "های", "ی", "تر", "تری"];
-        return PersianText.SearchTokens(label).Where(t => t.Length >= 2
-                                                          && t is not ("پوست" or "صورت" or "مو" or "موی" or "مراقبت"
-                                                              or "کننده" or "انواع" or "همه"))
-            .Count(t => words.Any(word => suffixes.Any(s => word == t + s)));
+        var tokens = PersianText.SearchTokens(label).Where(t => t.Length >= 2
+                                                               && t is not ("پوست" or "صورت" or "مو" or "موی" or "مراقبت"
+                                                                   or "کننده" or "انواع" or "همه")).ToArray();
+        if (tokens.Length > 1 && PersianText.ContainsPhrase(text, label))
+        {
+            return tokens.Length;
+        }
+
+        return tokens.Count(token => suffixes.Any(suffix => PersianText.ContainsPhrase(text, token + suffix)));
     }
 
     private static string? ExplicitCategory(string text, string? domain, CatalogVocabulary vocabulary)
@@ -460,6 +473,40 @@ public sealed partial class QueryBuilder(
     {
         var matches = profiles.Where(x => LabelScore(text, x.Name) > 0).ToArray();
         return matches.Length == 1 ? matches[0] : null;
+    }
+
+    private static void ApplyPhraseProfile(CatalogFilters filters, string message,
+        IEnumerable<CatalogPhrase>? mappings)
+    {
+        var matches = CatalogPhraseMatcher.FindProductMappings(message, mappings)
+            .Where(x => x.CatalogProfile is not null)
+            .OrderByDescending(x => PersianText.SearchTokens(x.Phrase).Count)
+            .ThenByDescending(x => x.Priority)
+            .ToArray();
+        if (matches.Length == 0)
+        {
+            return;
+        }
+
+        var specificity = PersianText.SearchTokens(matches[0].Phrase).Count;
+        var priority = matches[0].Priority;
+        var profiles = matches.Where(x => PersianText.SearchTokens(x.Phrase).Count == specificity
+                                          && x.Priority == priority)
+            .Select(x => x.CatalogProfile!).DistinctBy(x => x.Id).ToArray();
+        if (profiles.Length != 1)
+        {
+            return;
+        }
+
+        var profile = profiles[0];
+        if (profile.Kind == "skin" && profile.Slug != "skin-all")
+        {
+            filters.SkinType ??= profile.Slug;
+        }
+        else if (profile.Kind == "hair" && profile.Slug != "hair-all")
+        {
+            filters.HairType ??= profile.Slug;
+        }
     }
 
     private static string[] MatchExplicitConcerns(string text, IEnumerable<Concern> concerns)
@@ -516,6 +563,27 @@ public sealed partial class QueryBuilder(
         if (phraseMatch is not null)
         {
             return phraseMatch.Domain;
+        }
+
+        var mappedDomains = CatalogPhraseMatcher.FindProductMappings(text, catalogPhrases)
+            .Select(x => new
+            {
+                Domain = x.Category?.Domain ?? x.Concern?.Domain ?? x.CatalogProfile?.Kind,
+                Specificity = PersianText.SearchTokens(x.Phrase).Count,
+                x.Priority
+            })
+            .Where(x => !string.IsNullOrWhiteSpace(x.Domain))
+            .ToArray();
+        if (mappedDomains.Length > 0)
+        {
+            var specificity = mappedDomains.Max(x => x.Specificity);
+            var priority = mappedDomains.Where(x => x.Specificity == specificity).Max(x => x.Priority);
+            var bestDomains = mappedDomains.Where(x => x.Specificity == specificity && x.Priority == priority)
+                .Select(x => x.Domain!).Distinct(StringComparer.Ordinal).ToArray();
+            if (bestDomains.Length == 1)
+            {
+                return bestDomains[0];
+            }
         }
 
         var exact = all.Where(x => HasAny(text, PersianText.Normalize(x.Name))
@@ -582,11 +650,9 @@ public sealed partial class QueryBuilder(
         // from a different normalized domain into the match set.
         var candidates = all.Where(x => domain is null || x.Domain == domain).ToArray();
         var candidateIds = candidates.Select(x => x.Id).ToHashSet();
-        var normalizedText = " " + PersianText.Normalize(text) + " ";
-        var phraseMatches = (catalogPhrases ?? [])
-            .Where(x => x.IsActive && x.IdCategory is { } categoryId && candidateIds.Contains(categoryId)
-                        && x.Category is not null
-                        && normalizedText.Contains(" " + PersianText.Normalize(x.Phrase) + " ", StringComparison.Ordinal))
+        var phraseMatches = CatalogPhraseMatcher.FindProductMappings(text, catalogPhrases)
+            .Where(x => x.IdCategory is { } categoryId && candidateIds.Contains(categoryId)
+                        && x.Category is not null)
             .OrderByDescending(x => PersianText.SearchTokens(x.Phrase).Count)
             .ThenByDescending(x => x.Priority)
             .ToArray();
@@ -822,13 +888,11 @@ public sealed partial class QueryBuilder(
                 .Take(4)
                 .ToArray(),
             Brands = vocabulary.Brands.Where(x =>
-                    searchText.Contains(PersianText.Normalize(x.Name), StringComparison.Ordinal)
+                    PersianText.ContainsPhrase(searchText, x.Name)
                     || (x.Slug.StartsWith("ldora", StringComparison.Ordinal) && searchText.Contains("لدورا")))
                 .ToArray(),
             Ingredients = vocabulary.Ingredients.Where(x => request.ExcludeIngredientSlugs.Contains(x.Slug)
-                                                            || PersianText.Normalize(message)
-                                                                .Contains(PersianText.Normalize(x.Name),
-                                                                    StringComparison.Ordinal)
+                                                            || PersianText.ContainsPhrase(message, x.Name)
                                                             || message.Contains(x.Slug,
                                                                 StringComparison.OrdinalIgnoreCase))
                 .ToArray()
@@ -900,7 +964,9 @@ public sealed partial class QueryBuilder(
             properties,
             required = properties.Keys.ToArray()
         });
-        var parsed = await ollama.ChatStructuredAsync<QueryModelOutput>(
+        var parsed = await StructuredChatCompletion.GetAsync<QueryModelOutput>(
+            chatClient,
+            configuration,
             PipelinePrompts.Query,
             new
             {

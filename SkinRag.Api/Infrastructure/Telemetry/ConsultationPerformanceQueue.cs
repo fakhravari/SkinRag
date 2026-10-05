@@ -43,6 +43,8 @@ public sealed class ConsultationPerformanceQueue(
                         db.ConsultationPerformanceLogs.AddRange(batch);
                         await db.SaveChangesAsync(stoppingToken);
                         persisted = true;
+                        logger.LogInformation("Persisted consultation performance batch of {Count} records",
+                            batch.Count);
                     }
                     catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                     {

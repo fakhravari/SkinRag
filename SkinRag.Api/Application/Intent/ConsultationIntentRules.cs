@@ -1,4 +1,5 @@
 using SkinRag.Api.Application.Common.Text;
+using SkinRag.Api.Application.Common.Catalog;
 using SkinRag.Api.Domain.Catalog;
 
 namespace SkinRag.Api.Application.Intent;
@@ -24,20 +25,32 @@ internal static class ConsultationIntentRules
     private static readonly string[] DefinitionRequests =
     ["چیست", "چیه", "یعنی چه", "یعنی چی", "منظور از", "تعریف"];
 
-    public static IntentDecision? Match(string message, IReadOnlyList<Concern> concerns,
+    public static IntentDecision? Match(string message, IReadOnlyList<CatalogPhrase> phrases,
         IntentContext context)
     {
         var normalized = PersianText.Normalize(message);
-        var tokens = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var isExplicitProductRequest = (ContainsAny(normalized, ProductRequests)
-                                        || ContainsAny(normalized, ["می خواهم", "می خوام"]))
+        string[] genericWants = ["می خواهم", "می خوام", "میخواهم", "میخوام"];
+        var hasSpecificRequestPhrase = ContainsAny(normalized, ProductRequests.Where(phrase =>
+            !genericWants.Contains(PersianText.Normalize(phrase), StringComparer.Ordinal)));
+        var wantsSpecificProduct = ContainsAny(normalized, genericWants)
+                                   && ContainsAny(normalized, ProductTerms)
+                                   && !ContainsAny(normalized, DefinitionRequests);
+        var isExplicitProductRequest = (hasSpecificRequestPhrase || wantsSpecificProduct)
                                        && !ContainsAny(normalized, InformationalRequests);
 
-        var matched = concerns
-            .Where(x => x.Domain is "skin" or "hair"
-                        && (PhraseMatches(tokens, x.Name) || PhraseMatches(tokens, x.SearchTerms)))
-            .OrderByDescending(x => PersianText.SearchTokens(x.Name).Count)
+        var matchedDefinitions = CatalogPhraseMatcher.FindDefinitionOnlyMappings(message, phrases,
+                includeSearchTerms: true)
             .ToArray();
+        var matchedProductPhrases = CatalogPhraseMatcher.FindProductMappings(message, phrases,
+                includeSearchTerms: true)
+            .OrderByDescending(x => PersianText.SearchTokens(x.Phrase).Count)
+            .ToArray();
+        var matched = matchedProductPhrases.Where(x => x.Concern is not null).ToArray();
+        if (isExplicitProductRequest && matchedDefinitions.Length > 0 && matchedProductPhrases.Length == 0)
+        {
+            return new IntentDecision(ConsultationIntent.Unclear, 1, "definition-only-catalog-phrase");
+        }
+
         if (isExplicitProductRequest && ContainsAny(normalized, ProductTerms))
         {
             return new IntentDecision(ConsultationIntent.ProductSearch, 1, "catalog-product-request-rule");
@@ -66,18 +79,9 @@ internal static class ConsultationIntentRules
         return new IntentDecision(ConsultationIntent.SkinConsultation, 1, "catalog-concern-rule");
     }
 
-    private static bool PhraseMatches(IReadOnlyList<string> messageTokens, string phrase)
-    {
-        var phraseTokens = PersianText.Normalize(phrase).Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        return phraseTokens.Length > 0 && phraseTokens.All(expected =>
-            messageTokens.Any(actual => actual.Equals(expected, StringComparison.Ordinal)
-                                        || actual.StartsWith(expected, StringComparison.Ordinal)));
-    }
-
     private static bool ContainsAny(string text, IEnumerable<string> phrases)
     {
         var padded = " " + text + " ";
-        return phrases.Any(phrase => padded.Contains(" " + PersianText.Normalize(phrase) + " ",
-            StringComparison.Ordinal));
+        return phrases.Any(phrase => PersianText.ContainsPhrase(padded, phrase));
     }
 }
