@@ -13,6 +13,7 @@ using SkinRag.Api.Application.Prompts;
 using SkinRag.Api.Application.Retrieval;
 using SkinRag.Api.Application.Telemetry;
 using SkinRag.Api.Application.Validation;
+using SkinRag.Api.Domain.Catalog;
 
 namespace SkinRag.Api.Application.Consultation;
 
@@ -244,6 +245,9 @@ public sealed class ConsultationService(
         var plan = await MeasureAsync(() => queryBuilder.BuildAsync(request, message, intent, state, vocabulary, ct),
             elapsed => timing.QueryBuildMs = elapsed);
         timing.QuerySource = plan.Source;
+        timing.ResolvedDomain = ResolveLogDomain(plan.Filters, vocabulary.Categories);
+        timing.ResolvedCategorySlug = SingleOrSole(plan.Filters.CategorySlug, plan.Filters.CategorySlugs);
+        timing.ResolvedBrandSlug = SingleOrSole(plan.Filters.BrandSlug, plan.Filters.BrandSlugs);
         if (configuration.GetValue("Telemetry:LogSearchQuery", true))
         {
             timing.SearchQuery = plan.Query;
@@ -260,18 +264,28 @@ public sealed class ConsultationService(
         timing.ProductLoadMs = retrieval.ProductLoadMs;
         timing.RetrievalDiagnosticsJson = JsonSerializer.Serialize(new
         {
+            SchemaVersion = 2,
             plan.Source,
+            Intent = intent.Code,
+            IntentSource = intent.Source,
+            request.FiltersOnly,
+            ExplicitFilters = FilterSnapshot(request),
+            ResolvedFilters = FilterSnapshot(plan.Filters),
+            // Keep the original top-level JSON keys for existing log queries.
             plan.Filters.Domain,
             plan.Filters.CategorySlug,
             plan.Filters.Shade,
             plan.Filters.Shades,
             plan.Filters.Finish,
             plan.Filters.Finishes,
-            plan.ConcernSlugs,
+            InferredConcernSlugs = plan.InferredConcernSlugs,
+            ConcernSlugs = plan.InferredConcernSlugs,
+            plan.ProductIds,
             plan.InStockOnly,
             retrieval.EligibleProducts,
             EligibleProductIds = retrieval.EligibleProductIds ?? [],
-            ReturnedProductIds = retrieval.Products.Select(x => x.Product.Id).ToArray()
+            ReturnedProductIds = retrieval.Products.Select(x => x.Product.Id).ToArray(),
+            retrieval.Diagnostics
         });
 
         ConsultationResponse Result(
@@ -282,6 +296,13 @@ public sealed class ConsultationService(
             bool more = false,
             string? followUp = null)
         {
+            if (mode == "no-results")
+            {
+                timing.NoResultStage ??= retrieval.Diagnostics?.Stage ?? "consultation";
+                timing.NoResultCause ??= retrieval.Diagnostics?.Cause ?? "no-results";
+                timing.FirstRestoringFilter ??= retrieval.Diagnostics?.FirstRestoringFilter;
+            }
+
             return new ConsultationResponse(
                 answer,
                 products,
@@ -328,6 +349,7 @@ public sealed class ConsultationService(
                 .Select(m => m with { Product = fresh[m.Product.Id] }).ToArray();
             if (matches.Length == 0)
             {
+                SetRetrievalCause(timing, "live-product-load", "eligible-products-disappeared-before-detail-response");
                 return Result("اطلاعات یا موجودی محصول تغییر کرده است؛ دوباره جست‌وجو کنید.", [], "no-results");
             }
 
@@ -345,6 +367,7 @@ public sealed class ConsultationService(
             .Take(5).ToArray();
         if (context.Length == 0)
         {
+            SetRetrievalCause(timing, "recommendation-eligibility", "validation-removed-all-retrieved-products");
             return Result("در حال حاضر محصول قابل پیشنهاد مطابق درخواست شما موجود نیست.", [], "no-results");
         }
 
@@ -392,6 +415,7 @@ public sealed class ConsultationService(
 
         if (validated is null)
         {
+            SetRetrievalCause(timing, "answer-validation", "no-valid-products-after-grounded-fallback");
             return Result("موجودی یا اطلاعات محصولات تغییر کرده است؛ دوباره جست‌وجو کنید.", [], "no-results");
         }
 
@@ -402,6 +426,77 @@ public sealed class ConsultationService(
         return Finish(Result(answer, validated.Products, mode, notice, validated.NeedsMoreInformation,
             validated.FollowUpQuestion));
     }
+
+    private static object FilterSnapshot(CatalogFilters filters) => new
+    {
+        filters.Domain,
+        filters.Domains,
+        filters.CategorySlug,
+        filters.CategorySlugs,
+        filters.BrandSlug,
+        filters.BrandSlugs,
+        filters.SkinType,
+        filters.SkinTypes,
+        filters.HairType,
+        filters.HairTypes,
+        filters.ConcernSlug,
+        filters.ConcernSlugs,
+        filters.MinPrice,
+        filters.MaxPrice,
+        filters.Shade,
+        filters.Shades,
+        filters.Finish,
+        filters.Finishes,
+        filters.SizeValue,
+        filters.SizeUnit,
+        filters.FragranceFree,
+        filters.ExcludeIngredientSlugs
+    };
+
+    private static string? SingleOrSole(string? single, string[] values)
+    {
+        if (!string.IsNullOrWhiteSpace(single)) return single;
+        var selected = values.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.Ordinal).ToArray();
+        return selected.Length == 1 ? selected[0] : null;
+    }
+
+    private static string? ResolveLogDomain(CatalogFilters filters, IReadOnlyList<Category> categories)
+    {
+        var selectedDomain = SingleOrSole(filters.Domain, filters.Domains);
+        if (selectedDomain is not null)
+        {
+            return selectedDomain;
+        }
+
+        var selectedCategories = filters.CategorySlugs.Append(filters.CategorySlug)
+            .Where(x => !string.IsNullOrWhiteSpace(x)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var domains = categories.Where(x => selectedCategories.Contains(x.Slug))
+            .Select(x => x.Domain).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        return domains.Length == 1 ? domains[0] : null;
+    }
+
+    private static void SetRetrievalCause(ConsultationPerformanceLog timing, string stage, string cause)
+    {
+        timing.NoResultStage = stage;
+        timing.NoResultCause = cause;
+        var previous = timing.RetrievalDiagnosticsJson is null ? "null" : timing.RetrievalDiagnosticsJson;
+        using var document = JsonDocument.Parse(previous);
+        var merged = new Dictionary<string, JsonElement>();
+        if (document.RootElement.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                merged[property.Name] = property.Value.Clone();
+            }
+        }
+
+        merged["FinalNoResult"] = JsonSerializer.SerializeToElement(new { Stage = stage, Cause = cause });
+        timing.FirstRestoringFilter ??= JsonSerializer.Deserialize<RetrievalDiagnosticsEnvelope>(previous)
+            ?.Diagnostics?.FirstRestoringFilter;
+        timing.RetrievalDiagnosticsJson = JsonSerializer.Serialize(merged);
+    }
+
+    private sealed record RetrievalDiagnosticsEnvelope(RetrievalDiagnostics? Diagnostics);
 
     private static async Task<T> MeasureAsync<T>(Func<Task<T>> operation, Action<double> record)
     {

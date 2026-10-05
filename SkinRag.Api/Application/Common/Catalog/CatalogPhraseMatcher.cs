@@ -46,7 +46,8 @@ public static class CatalogPhraseMatcher
     private static bool ContainsAllPhraseTokens(string phrase, IReadOnlySet<string> messageTokens)
     {
         var tokens = PersianText.SearchTokens(phrase);
-        return tokens.Count >= 2 && tokens.All(messageTokens.Contains);
+        return tokens.Count >= 2 && tokens.All(phraseToken =>
+            messageTokens.Any(messageToken => PersianText.SearchTokenMatches(messageToken, phraseToken)));
     }
 
     public static IEnumerable<CatalogPhrase> FindProductMappings(string text,

@@ -8,7 +8,7 @@ public sealed record SearchPlan(
     string Query,
     CatalogFilters Filters,
     ConsultationIntent Intent,
-    string[] ConcernSlugs,
+    string[] InferredConcernSlugs,
     bool PreferBudget,
     int[] ProductIds,
     bool InStockOnly = true,
@@ -34,7 +34,24 @@ public sealed record RetrievalResult(
     double SqlFilterMs = 0,
     double EmbeddingMs = 0,
     double ProductLoadMs = 0,
-    int[]? EligibleProductIds = null);
+    int[]? EligibleProductIds = null,
+    RetrievalDiagnostics? Diagnostics = null);
+
+public sealed record RetrievalDiagnostics(
+    string Stage,
+    string Cause,
+    string? FirstRestoringFilter = null,
+    ZeroResultFilterDiagnosis? FilterDiagnosis = null,
+    int? EligibleCount = null,
+    int? IndexCandidateCount = null,
+    int? SimilarityCandidateCount = null,
+    int? LiveProductCount = null);
+
+public sealed record FilterRelaxationCount(string Filter, int RemainingProducts);
+
+public sealed record ZeroResultFilterDiagnosis(
+    IReadOnlyList<FilterRelaxationCount> IndividualRelaxations,
+    IReadOnlyList<FilterRelaxationCount> CumulativeRelaxations);
 
 public interface IProductRetriever
 {

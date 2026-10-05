@@ -70,8 +70,60 @@ public static class PersianText
     {
         var normalizedText = NormalizeForMatch(text);
         var normalizedPhrase = NormalizeForMatch(phrase);
-        return normalizedPhrase.Length > 0
-               && (" " + normalizedText + " ").Contains(" " + normalizedPhrase + " ", StringComparison.Ordinal);
+        if (normalizedPhrase.Length == 0)
+        {
+            return false;
+        }
+
+        if ((" " + normalizedText + " ").Contains(" " + normalizedPhrase + " ", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var textTokens = normalizedText.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var phraseTokens = normalizedPhrase.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (phraseTokens.Length > textTokens.Length)
+        {
+            return false;
+        }
+
+        for (var start = 0; start <= textTokens.Length - phraseTokens.Length; start++)
+        {
+            var matches = true;
+            for (var offset = 0; offset < phraseTokens.Length; offset++)
+            {
+                if (textTokens[start + offset] == phraseTokens[offset]
+                    || IsEzafeVariant(textTokens[start + offset], phraseTokens[offset]))
+                {
+                    continue;
+                }
+
+                matches = false;
+                break;
+            }
+
+            if (matches)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Matches a token with the attached Persian ezafe yeh after a long vowel.</summary>
+    public static bool SearchTokenMatches(string candidate, string expected)
+    {
+        return candidate == expected || IsEzafeVariant(candidate, expected);
+    }
+
+    private static bool IsEzafeVariant(string candidate, string expected)
+    {
+        return expected.Length >= 2
+               && candidate.Length == expected.Length + 1
+               && candidate.StartsWith(expected, StringComparison.Ordinal)
+               && candidate[^1] == 'ی'
+               && expected[^1] is 'ا' or 'آ' or 'و';
     }
 
     public static FrozenSet<string> SearchTokens(string text)

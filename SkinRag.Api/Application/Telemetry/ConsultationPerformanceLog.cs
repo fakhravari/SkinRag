@@ -25,6 +25,12 @@ public sealed class ConsultationPerformanceLog
     public string? ModelCallsJson { get; set; }
     public string? SearchQuery { get; set; }
     public string? RetrievalDiagnosticsJson { get; set; }
+    public string? ResolvedDomain { get; set; }
+    public string? ResolvedCategorySlug { get; set; }
+    public string? ResolvedBrandSlug { get; set; }
+    public string? NoResultStage { get; set; }
+    public string? NoResultCause { get; set; }
+    public string? FirstRestoringFilter { get; set; }
     public string? ClientIpAddress { get; set; }
     public string? UserAgent { get; set; }
     public string? BrowserName { get; set; }

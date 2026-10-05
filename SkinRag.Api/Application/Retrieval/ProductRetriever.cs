@@ -24,8 +24,24 @@ public sealed class ProductRetriever(
         if (eligible.Length == 0)
         {
             LogVariantRetrieval(plan, hasVariantConstraint, [], []);
+            var diagnosisTimer = Stopwatch.StartNew();
+            var filterDiagnosis = await repository.DiagnoseZeroResultsAsync(plan, ct);
+            diagnosisTimer.Stop();
+            sqlFilterMs += diagnosisTimer.Elapsed.TotalMilliseconds;
+            var restoringFilter = filterDiagnosis.IndividualRelaxations
+                .FirstOrDefault(x => x.RemainingProducts > 0)?.Filter;
+            var cumulativeRestoringFilter = filterDiagnosis.CumulativeRelaxations
+                .FirstOrDefault(x => x.RemainingProducts > 0)?.Filter;
+            var diagnostics = new RetrievalDiagnostics(
+                "sql-filters",
+                restoringFilter is not null ? "single-filter-relaxation-restores-results"
+                    : cumulativeRestoringFilter is not null ? "combined-filter-relaxation-restores-results"
+                    : "no-filter-relaxation-restores-results",
+                restoringFilter ?? cumulativeRestoringFilter,
+                filterDiagnosis,
+                EligibleCount: 0);
             return new RetrievalResult([], 0, index.Snapshot().UpdatedAtUtc, "sql-filters", sqlFilterMs,
-                EligibleProductIds: []);
+                EligibleProductIds: [], Diagnostics: diagnostics);
         }
 
         if (plan.ProductIds.Length > 0)
@@ -56,7 +72,18 @@ public sealed class ProductRetriever(
         {
             LogVariantRetrieval(plan, hasVariantConstraint, eligible, []);
             return new RetrievalResult([], eligible.Length, snapshot.UpdatedAtUtc, "hybrid-vector-lexical",
-                EligibleProductIds: eligible);
+                EligibleProductIds: eligible,
+                Diagnostics: new RetrievalDiagnostics("knowledge-index", "eligible-products-missing-from-index",
+                    EligibleCount: eligible.Length, IndexCandidateCount: 0));
+        }
+
+        IReadOnlyDictionary<int, int> concernMatchCounts = new Dictionary<int, int>();
+        if (plan.InferredConcernSlugs.Length > 0)
+        {
+            var concernTimer = Stopwatch.StartNew();
+            concernMatchCounts = await repository.CountConcernMatchesAsync(eligible, plan.InferredConcernSlugs, ct);
+            concernTimer.Stop();
+            sqlFilterMs += concernTimer.Elapsed.TotalMilliseconds;
         }
 
         var embeddingTimer = Stopwatch.StartNew();
@@ -72,7 +99,10 @@ public sealed class ProductRetriever(
         var tokens = PersianText.SearchTokens(plan.Query);
         var norm = Math.Sqrt(vector.Sum(v => (double)v * v));
         var minimum = configuration.GetValue("Rag:MinimumSimilarity", .20);
+        var concernMatchBoost = configuration.GetValue("Rag:ConcernMatchBoost", .05);
         var topK = Math.Clamp(configuration.GetValue("Rag:TopK", 5), 1, 10);
+        var similarityCandidates = candidates.Count(x => hasVariantConstraint
+            || Cosine(vector, x.Embedding, norm, x.VectorNorm) >= minimum);
         var ranked = candidates.Select(d => new
             {
                 Document = d,
@@ -85,6 +115,7 @@ public sealed class ProductRetriever(
             {
                 Id = x.Document.ProductId,
                 x.Similarity,
+                ConcernMatches = concernMatchCounts.GetValueOrDefault(x.Document.ProductId),
                 LexicalScore = tokens.Count == 0
                     ? 0
                     : (double)tokens.Count(x.Document.Tokens.Contains) / tokens.Count
@@ -93,20 +124,31 @@ public sealed class ProductRetriever(
             {
                 x.Id,
                 x.Similarity,
-                Score = hasVariantConstraint
+                Score = Math.Min(1, (hasVariantConstraint
                     ? .55 * x.Similarity + .45 * x.LexicalScore
-                    : .8 * x.Similarity + .2 * x.LexicalScore
+                    : .8 * x.Similarity + .2 * x.LexicalScore)
+                    + concernMatchBoost * x.ConcernMatches / Math.Max(1, plan.InferredConcernSlugs.Length))
             })
             .OrderByDescending(x => x.Score)
             .ThenBy(x => x.Id)
             .Take(plan.PreferBudget ? topK * 4 : topK)
             .ToArray();
+        if (ranked.Length == 0)
+        {
+            return new RetrievalResult([], eligible.Length, snapshot.UpdatedAtUtc, "hybrid-vector-lexical",
+                sqlFilterMs, embeddingTimer.Elapsed.TotalMilliseconds,
+                EligibleProductIds: eligible,
+                Diagnostics: new RetrievalDiagnostics("similarity", "all-index-candidates-below-threshold",
+                    EligibleCount: eligible.Length, IndexCandidateCount: candidates.Length,
+                    SimilarityCandidateCount: similarityCandidates));
+        }
         // Prices/stock are re-read from SQL, even when a cached embedding was used.
         var loadTimer = Stopwatch.StartNew();
         var live = (await repository.LoadAsync(ranked.Select(x => x.Id), plan, ct)).ToDictionary(x => x.Id);
         loadTimer.Stop();
         var matches = ranked.Where(x => live.ContainsKey(x.Id)).Select(x =>
             new ProductMatch(live[x.Id], Math.Round(x.Similarity, 4), Math.Round(x.Score, 4)));
+        var liveMatchCount = live.Count;
         matches = plan.PreferBudget ? matches.OrderBy(x => x.Product.Price).ThenByDescending(x => x.Score) : matches;
         var selectedMatches = matches.Take(topK).ToArray();
         LogVariantRetrieval(plan, hasVariantConstraint, eligible, selectedMatches.Select(x => x.Product.Id).ToArray());
@@ -118,7 +160,12 @@ public sealed class ProductRetriever(
             sqlFilterMs,
             embeddingTimer.Elapsed.TotalMilliseconds,
             loadTimer.Elapsed.TotalMilliseconds,
-            eligible);
+            eligible,
+            selectedMatches.Length == 0
+                ? new RetrievalDiagnostics("live-product-load", "products-became-ineligible-before-response",
+                    EligibleCount: eligible.Length, IndexCandidateCount: candidates.Length,
+                    SimilarityCandidateCount: similarityCandidates, LiveProductCount: liveMatchCount)
+                : null);
     }
 
     private static bool HasVariantConstraint(CatalogFilters filters) =>

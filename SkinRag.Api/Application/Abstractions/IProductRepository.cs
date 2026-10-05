@@ -10,5 +10,8 @@ public interface IProductRepository
 
     Task<IReadOnlyList<CatalogPhrase>> IntentPhrasesAsync(CancellationToken ct);
     Task<int[]> EligibleIdsAsync(SearchPlan plan, CancellationToken ct);
+    Task<ZeroResultFilterDiagnosis> DiagnoseZeroResultsAsync(SearchPlan plan, CancellationToken ct);
+    Task<IReadOnlyDictionary<int, int>> CountConcernMatchesAsync(int[] productIds, string[] concernSlugs,
+        CancellationToken ct);
     Task<IReadOnlyList<ProductDto>> LoadAsync(IEnumerable<int> ids, SearchPlan plan, CancellationToken ct);
 }

@@ -138,6 +138,12 @@ public sealed class SkinRagDbContext(DbContextOptions<SkinRagDbContext> options)
             entity.Property(x => x.QuerySource).HasMaxLength(500);
             entity.Property(x => x.SearchQuery).HasColumnType("nvarchar(max)");
             entity.Property(x => x.RetrievalDiagnosticsJson).HasColumnType("nvarchar(max)");
+            entity.Property(x => x.ResolvedDomain).HasMaxLength(40);
+            entity.Property(x => x.ResolvedCategorySlug).HasMaxLength(80);
+            entity.Property(x => x.ResolvedBrandSlug).HasMaxLength(80);
+            entity.Property(x => x.NoResultStage).HasMaxLength(40);
+            entity.Property(x => x.NoResultCause).HasMaxLength(100);
+            entity.Property(x => x.FirstRestoringFilter).HasMaxLength(80);
             entity.Property(x => x.ModelCallsJson).HasColumnType("nvarchar(max)");
             entity.Property(x => x.ClientIpAddress).HasMaxLength(45);
             entity.Property(x => x.UserAgent).HasMaxLength(1000);
@@ -147,6 +153,9 @@ public sealed class SkinRagDbContext(DbContextOptions<SkinRagDbContext> options)
             entity.Property(x => x.HttpMethod).HasMaxLength(10);
             entity.Property(x => x.TraceIdentifier).HasMaxLength(64);
             entity.HasIndex(x => x.StartedAtLocal);
+            entity.HasIndex(x => new { x.NoResultCause, x.StartedAtLocal })
+                .HasDatabaseName("IX_ConsultationPerformanceLogs_NoResultCause_StartedAtLocal")
+                .HasFilter("[NoResultCause] IS NOT NULL");
         });
     }
 }
