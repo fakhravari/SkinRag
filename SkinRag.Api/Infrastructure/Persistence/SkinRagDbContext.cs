@@ -85,12 +85,14 @@ public sealed class SkinRagDbContext(DbContextOptions<SkinRagDbContext> options)
             entity.Property(x => x.Definition).HasMaxLength(1000);
             entity.HasIndex(x => x.Phrase);
             entity.ToTable(table => table.HasCheckConstraint("CK_CatalogPhrases_MappingStatus",
-                "([MappingStatus] = N'Product' AND ([IdCategory] IS NOT NULL OR [IdConcern] IS NOT NULL OR [IdCatalogProfile] IS NOT NULL)) OR ([MappingStatus] = N'DefinitionOnly' AND [Definition] IS NOT NULL)"));
+                "([MappingStatus] = N'Product' AND ([IdCategory] IS NOT NULL OR [IdConcern] IS NOT NULL OR [IdCatalogProfile] IS NOT NULL OR [IdIngredient] IS NOT NULL)) OR ([MappingStatus] = N'DefinitionOnly' AND [Definition] IS NOT NULL)"));
             entity.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.IdCategory)
                 .OnDelete(DeleteBehavior.NoAction);
             entity.HasOne(x => x.Concern).WithMany().HasForeignKey(x => x.IdConcern)
                 .OnDelete(DeleteBehavior.NoAction);
             entity.HasOne(x => x.CatalogProfile).WithMany().HasForeignKey(x => x.IdCatalogProfile)
+                .OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne<Ingredient>().WithMany().HasForeignKey(x => x.IdIngredient)
                 .OnDelete(DeleteBehavior.NoAction);
         });
         modelBuilder.Entity<Brand>().ToTable("Brands");

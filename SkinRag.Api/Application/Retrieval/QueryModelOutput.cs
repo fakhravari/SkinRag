@@ -24,6 +24,8 @@ public sealed class QueryModelOutput
 
     [JsonRequired] public string[] ExcludeIngredientSlugs { get; init; } = [];
 
+    [JsonRequired] public string[] IncludeIngredientSlugs { get; init; } = [];
+
     [JsonRequired] public bool? FragranceFree { get; init; }
 
     [JsonRequired] public string PricePreference { get; init; } = "neutral";

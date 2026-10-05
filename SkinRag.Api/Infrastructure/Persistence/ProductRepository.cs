@@ -88,6 +88,8 @@ public sealed class ProductRepository(IDbContextFactory<SkinRagDbContext> factor
             AddFilter("fragranceFree", f => f.FragranceFree = null);
         if (filters.ExcludeIngredientSlugs.Length > 0)
             AddFilter("excludedIngredients", f => f.ExcludeIngredientSlugs = []);
+        if (filters.IncludeIngredientSlugs.Length > 0)
+            AddFilter("includedIngredients", f => f.IncludeIngredientSlugs = []);
         if (plan.InStockOnly)
             relaxations.Add(("inStock", current => current with { InStockOnly = false }));
         if (plan.ProductIds.Length > 0)
@@ -136,6 +138,22 @@ public sealed class ProductRepository(IDbContextFactory<SkinRagDbContext> factor
         await using var db = await factory.CreateDbContextAsync(ct);
         return await db.Set<ProductConcern>().AsNoTracking()
             .Where(x => productIds.Contains(x.IdProduct) && concernSlugs.Contains(x.Concern.Slug))
+            .GroupBy(x => x.IdProduct)
+            .Select(group => new { ProductId = group.Key, MatchCount = group.Count() })
+            .ToDictionaryAsync(x => x.ProductId, x => x.MatchCount, ct);
+    }
+
+    public async Task<IReadOnlyDictionary<int, int>> CountProfileMatchesAsync(int[] productIds,
+        string[] profileSlugs, CancellationToken ct)
+    {
+        if (productIds.Length == 0 || profileSlugs.Length == 0)
+        {
+            return new Dictionary<int, int>();
+        }
+
+        await using var db = await factory.CreateDbContextAsync(ct);
+        return await db.Set<ProductProfile>().AsNoTracking()
+            .Where(x => productIds.Contains(x.IdProduct) && profileSlugs.Contains(x.CatalogProfile.Slug))
             .GroupBy(x => x.IdProduct)
             .Select(group => new { ProductId = group.Key, MatchCount = group.Count() })
             .ToDictionaryAsync(x => x.ProductId, x => x.MatchCount, ct);

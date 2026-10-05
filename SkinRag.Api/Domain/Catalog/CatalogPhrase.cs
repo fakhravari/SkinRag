@@ -10,6 +10,7 @@ public sealed class CatalogPhrase
     public Concern? Concern { get; set; }
     public int? IdCatalogProfile { get; set; }
     public CatalogProfile? CatalogProfile { get; set; }
+    public int? IdIngredient { get; set; }
     public string Phrase { get; set; } = "";
     public string? SearchTerms { get; set; }
     public string MappingStatus { get; set; } = CatalogPhraseStatus.Product;

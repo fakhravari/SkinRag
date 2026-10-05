@@ -4,6 +4,7 @@ using SkinRag.Api.Application.Abstractions;
 using SkinRag.Api.Application.Common.AI;
 using SkinRag.Api.Application.Common.Text;
 using SkinRag.Api.Application.Contracts.Catalog;
+using SkinRag.Api.Application.Intent;
 
 namespace SkinRag.Api.Application.Retrieval;
 
@@ -32,6 +33,31 @@ public sealed class ProductRetriever(
                 .FirstOrDefault(x => x.RemainingProducts > 0)?.Filter;
             var cumulativeRestoringFilter = filterDiagnosis.CumulativeRelaxations
                 .FirstOrDefault(x => x.RemainingProducts > 0)?.Filter;
+            if (plan.Intent is ConsultationIntent.ProductSearch or ConsultationIntent.SkinConsultation
+                && plan.ProductIds.Length == 0
+                && filterDiagnosis.IndividualRelaxations.Any(x => x.Filter == "brand" && x.RemainingProducts > 0))
+            {
+                var alternativeFilters = QueryBuilder.CopyFilters(plan.Filters);
+                alternativeFilters.BrandSlug = null;
+                alternativeFilters.BrandSlugs = [];
+                var alternativePlan = plan with { Filters = alternativeFilters };
+                var alternatives = await RetrieveAsync(alternativePlan, ct);
+                if (alternatives.Products.Count > 0)
+                {
+                    return alternatives with
+                    {
+                        SqlFilterMs = sqlFilterMs + alternatives.SqlFilterMs,
+                        Diagnostics = new RetrievalDiagnostics(
+                            "sql-filters",
+                            "requested-brand-unavailable-alternatives",
+                            "brand",
+                            filterDiagnosis,
+                            EligibleCount: alternatives.EligibleProducts),
+                        EffectivePlan = alternativePlan
+                    };
+                }
+            }
+
             var diagnostics = new RetrievalDiagnostics(
                 "sql-filters",
                 restoringFilter is not null ? "single-filter-relaxation-restores-results"
@@ -86,6 +112,16 @@ public sealed class ProductRetriever(
             sqlFilterMs += concernTimer.Elapsed.TotalMilliseconds;
         }
 
+        var inferredProfiles = plan.InferredProfileSlugs ?? [];
+        IReadOnlyDictionary<int, int> profileMatchCounts = new Dictionary<int, int>();
+        if (inferredProfiles.Length > 0)
+        {
+            var profileTimer = Stopwatch.StartNew();
+            profileMatchCounts = await repository.CountProfileMatchesAsync(eligible, inferredProfiles, ct);
+            profileTimer.Stop();
+            sqlFilterMs += profileTimer.Elapsed.TotalMilliseconds;
+        }
+
         var embeddingTimer = Stopwatch.StartNew();
         var embeddingText = (configuration["Rag:QueryPrefix"] ?? "") + plan.Query;
         var vector = (await embeddingGenerator.GenerateVectorsAsync([embeddingText],
@@ -100,6 +136,7 @@ public sealed class ProductRetriever(
         var norm = Math.Sqrt(vector.Sum(v => (double)v * v));
         var minimum = configuration.GetValue("Rag:MinimumSimilarity", .20);
         var concernMatchBoost = configuration.GetValue("Rag:ConcernMatchBoost", .05);
+        var profileMatchBoost = configuration.GetValue("Rag:ProfileMatchBoost", .05);
         var topK = Math.Clamp(configuration.GetValue("Rag:TopK", 5), 1, 10);
         var similarityCandidates = candidates.Count(x => hasVariantConstraint
             || Cosine(vector, x.Embedding, norm, x.VectorNorm) >= minimum);
@@ -116,6 +153,7 @@ public sealed class ProductRetriever(
                 Id = x.Document.ProductId,
                 x.Similarity,
                 ConcernMatches = concernMatchCounts.GetValueOrDefault(x.Document.ProductId),
+                ProfileMatches = profileMatchCounts.GetValueOrDefault(x.Document.ProductId),
                 LexicalScore = tokens.Count == 0
                     ? 0
                     : (double)tokens.Count(x.Document.Tokens.Contains) / tokens.Count
@@ -127,7 +165,8 @@ public sealed class ProductRetriever(
                 Score = Math.Min(1, (hasVariantConstraint
                     ? .55 * x.Similarity + .45 * x.LexicalScore
                     : .8 * x.Similarity + .2 * x.LexicalScore)
-                    + concernMatchBoost * x.ConcernMatches / Math.Max(1, plan.InferredConcernSlugs.Length))
+                    + concernMatchBoost * x.ConcernMatches / Math.Max(1, plan.InferredConcernSlugs.Length)
+                    + profileMatchBoost * x.ProfileMatches / Math.Max(1, inferredProfiles.Length))
             })
             .OrderByDescending(x => x.Score)
             .ThenBy(x => x.Id)

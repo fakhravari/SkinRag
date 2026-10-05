@@ -56,7 +56,8 @@ public static class PipelinePrompts
                                 "یه رژ لب صورتی مات میخوام"=>beauty/lipstick/pink/matte. Select shade and finish only from the supplied
                                 shades/finishes lists (for example, صورتی=>صورتی and مات=>مات); don't guess from a vague color description.
                                 Cheap requests: pricePreference budget; otherwise neutral. Never calculate prices.
-                                Previous user query only resolves a follow-up. Exclude ingredients/fragrance only if explicitly requested.
+                                Previous user query only resolves a follow-up. Put explicitly requested ingredients in includeIngredientSlugs;
+                                put ingredients to avoid in excludeIngredientSlugs. Exclude fragrance only if explicitly requested.
                                 """;
 
     public const string Consultation = """

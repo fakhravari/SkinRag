@@ -14,6 +14,7 @@ public class CatalogFilters : IValidatableObject
     [MaxLength(20)] public string[] CategorySlugs { get; set; } = [];
     [MaxLength(80)] public string? BrandSlug { get; set; }
     [MaxLength(20)] public string[] BrandSlugs { get; set; } = [];
+    [MaxLength(20)] public string[] ExcludedBrandSlugs { get; set; } = [];
     [MaxLength(100)] public string? SkinType { get; set; }
     [MaxLength(20)] public string[] SkinTypes { get; set; } = [];
     [MaxLength(100)] public string? HairType { get; set; }
@@ -38,6 +39,7 @@ public class CatalogFilters : IValidatableObject
     [RegularExpression("^(ml|g|pcs)$")] public string? SizeUnit { get; set; }
     public bool? FragranceFree { get; set; }
     [MaxLength(20)] public string[] ExcludeIngredientSlugs { get; set; } = [];
+    [MaxLength(20)] public string[] IncludeIngredientSlugs { get; set; } = [];
 
     public virtual IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
@@ -54,9 +56,17 @@ public class CatalogFilters : IValidatableObject
                 [nameof(ExcludeIngredientSlugs)]);
         }
 
+        if (IncludeIngredientSlugs is null
+            || IncludeIngredientSlugs.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 80))
+        {
+            yield return new ValidationResult("ترکیبات درخواستی باید با slug معتبر ارسال شوند.",
+                [nameof(IncludeIngredientSlugs)]);
+        }
+
         if (Domains is null || Domains.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 80)
             || CategorySlugs is null || CategorySlugs.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 80)
             || BrandSlugs is null || BrandSlugs.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 80)
+            || ExcludedBrandSlugs is null || ExcludedBrandSlugs.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 80)
             || SkinTypes is null || SkinTypes.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 100)
             || HairTypes is null || HairTypes.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 100)
             || ConcernSlugs is null || ConcernSlugs.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 80)

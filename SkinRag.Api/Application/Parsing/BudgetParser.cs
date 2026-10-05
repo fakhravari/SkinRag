@@ -32,14 +32,14 @@ public static partial class BudgetParser
     public const decimal MaximumAllowedRials = 1_000_000_000m;
 
     private const string Amount =
-        @"(?<amount>[+-]?[0-9]+(?:[.,٫٬][0-9]+)*)\s*(?<scale>هزار|میلیون|میلیارد)?\s*(?<currency>تومان|تومن|ریال)?(?![\p{L}\p{N}])";
+        @"(?<amount>[+-]?[0-9]+(?:[.,٫٬][0-9]+)*)\s*(?<scale>هزار|میلیون|میلیارد)?\s*(?<currency>تومان(?:ه)?|تومن(?:ه)?|ریال(?:ه)?)?(?![\p{L}\p{N}])";
 
     [GeneratedRegex(
-        @"(?<![\p{L}\p{N}])(?:بین|از)\s*(?<lowAmount>[+-]?[0-9]+(?:[.,٫٬][0-9]+)*)\s*(?<lowScale>هزار|میلیون|میلیارد)?\s*(?<lowCurrency>تومان|تومن|ریال)?\s*(?:تا|الی)\s*(?<highAmount>[+-]?[0-9]+(?:[.,٫٬][0-9]+)*)\s*(?<highScale>هزار|میلیون|میلیارد)?\s*(?<highCurrency>تومان|تومن|ریال)?(?![\p{L}\p{N}])")]
+        @"(?<![\p{L}\p{N}])(?:بین|از)\s*(?<lowAmount>[+-]?[0-9]+(?:[.,٫٬][0-9]+)*)\s*(?<lowScale>هزار|میلیون|میلیارد)?\s*(?<lowCurrency>تومان(?:ه)?|تومن(?:ه)?|ریال(?:ه)?)?\s*(?:تا|الی)\s*(?<highAmount>[+-]?[0-9]+(?:[.,٫٬][0-9]+)*)\s*(?<highScale>هزار|میلیون|میلیارد)?\s*(?<highCurrency>تومان(?:ه)?|تومن(?:ه)?|ریال(?:ه)?)?(?![\p{L}\p{N}])")]
     private static partial Regex BudgetRange();
 
     [GeneratedRegex(
-        @"(?<![\p{L}\p{N}])(?:تا|زیر|حداکثر|بودجه(?:\s+(?:من|ام))?(?:\s+(?:تا|است|هست|حدود))?|سقف(?:\s+قیمت)?|با\s+بودجه)\s*(?:قیمت\s*)?" +
+        @"(?<![\p{L}\p{N}])(?:تا|زیر|حداکثر|بودجه(?:\s+(?:من|ام|م))?(?:\s+(?:تا|است|هست|حدود))?|سقف(?:\s+قیمت)?|با\s+بودجه)\s*(?:قیمت\s*)?" +
         Amount)]
     private static partial Regex BudgetLimit();
 
@@ -183,7 +183,8 @@ public static partial class BudgetParser
             "میلیارد" => 1_000_000_000m,
             _ => 1m
         };
-        if (currency is "تومان" or "تومن")
+        if (currency.StartsWith("تومان", StringComparison.Ordinal)
+            || currency.StartsWith("تومن", StringComparison.Ordinal))
         {
             multiplier *= 10;
         }

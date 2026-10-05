@@ -189,6 +189,13 @@ public sealed class ConsultationService(
                 intent.Clarification?.ToString());
         }
 
+        if (intent.Source == "moisturizer-texture-comparison-rule")
+        {
+            return Direct(
+                "برای پوست چرب، ژل مرطوب‌کننده معمولاً بافت سبک‌تری دارد و انتخاب راحت‌تری است. اگر پوستتان با کرم بهتر کنار می‌آید، کرم هم می‌تواند مناسب باشد؛ کاتالوگ فقط نوع محصول را ثبت می‌کند و بافت هر فرمول را جداگانه تأیید نمی‌کند.",
+                "consultation");
+        }
+
         if (!intent.IsRelevant)
         {
             if (intent.Intent is ConsultationIntent.Greeting or ConsultationIntent.SmallTalk)
@@ -226,10 +233,15 @@ public sealed class ConsultationService(
 
             return intent.Intent switch
             {
+                ConsultationIntent.Unclear when intent.Source == "unsupported-no-rinse-dry-shampoo" => Direct(
+                    "در کاتالوگ فعلی شامپوی خشکِ بدون نیاز به آبکشی ثبت نشده است؛ دستهٔ «شامپو موی خشک» مربوط به موی خشک است و شامپوی بدون آبکشی نیست.",
+                    "catalog-gap"),
                 ConsultationIntent.OffTopic => Direct(
                     "من درباره محصولات پوست، مو و زیبایی پاسخ می‌دهم. لطفاً پرسشی در همین زمینه بنویسید.", "off-topic"),
                 ConsultationIntent.Unsafe => Direct(
-                    "برای این درخواست نمی‌توانم راهنمایی بدهم. می‌توانم اطلاعات ثبت‌شده و روش مصرف محصولات پوست، مو و زیبایی را بررسی کنم.",
+                    intent.Source == "medical-infection-rule"
+                        ? "برای جوش عفونی نمی‌توانم از راه دور کرم درمانی تجویز کنم. اگر درد، ترشح چرکی، گسترش قرمزی یا تب دارید، با پزشک یا داروساز مشورت کنید. برای مراقبت روزمرهٔ غیر درمانی می‌توانم محصولات ملایم کاتالوگ را پیدا کنم."
+                        : "برای این درخواست نمی‌توانم راهنمایی بدهم. می‌توانم اطلاعات ثبت‌شده و روش مصرف محصولات پوست، مو و زیبایی را بررسی کنم.",
                     "unsafe"),
                 _ => Direct(clarification, "clarification",
                     true,
@@ -271,6 +283,9 @@ public sealed class ConsultationService(
             request.FiltersOnly,
             ExplicitFilters = FilterSnapshot(request),
             ResolvedFilters = FilterSnapshot(plan.Filters),
+            EffectiveFilters = retrieval.EffectivePlan is null
+                ? null
+                : FilterSnapshot(retrieval.EffectivePlan.Filters),
             // Keep the original top-level JSON keys for existing log queries.
             plan.Filters.Domain,
             plan.Filters.CategorySlug,
@@ -280,6 +295,7 @@ public sealed class ConsultationService(
             plan.Filters.Finishes,
             InferredConcernSlugs = plan.InferredConcernSlugs,
             ConcernSlugs = plan.InferredConcernSlugs,
+            InferredProfileSlugs = plan.InferredProfileSlugs ?? [],
             plan.ProductIds,
             plan.InStockOnly,
             retrieval.EligibleProducts,
@@ -326,23 +342,72 @@ public sealed class ConsultationService(
         {
             if (response.Products.Count > 0)
             {
-                conversations.Save(state, message, response.Products.Select(p => p.Product.Id), plan);
+                conversations.Save(state, message, response.Products.Select(p => p.Product.Id),
+                    retrieval.EffectivePlan ?? plan);
             }
 
             return response;
         }
 
+        var effectivePlan = retrieval.EffectivePlan ?? plan;
+        var retrievalNotice = retrieval.Diagnostics?.Cause == "requested-brand-unavailable-alternatives"
+            ? "محصول برند درخواستی موجود نبود؛ گزینه‌های نمایش‌داده‌شده از برندهای دیگرند."
+            : null;
+        var responseNotice = plan.Notice ?? retrievalNotice;
+        if (plan.InferredProfileSlugs?.Contains("hair-fine", StringComparer.Ordinal) == true
+            && retrieval.Products.Count > 0
+            && retrieval.Products.All(x => !x.Product.Profiles.Contains("hair-fine", StringComparer.Ordinal)))
+        {
+            const string fineHairNotice = "نوع موی نازک برای شامپوهای موجود در کاتالوگ ثبت نشده است؛ این گزینه‌ها شامپو هستند اما سازگاری‌شان با موی نازک تأیید نشده.";
+            responseNotice = string.IsNullOrWhiteSpace(responseNotice)
+                ? fineHairNotice
+                : $"{responseNotice} {fineHairNotice}";
+        }
+
         if (retrieval.Products.Count == 0)
         {
+            var requestedCategorySlugs = plan.Filters.CategorySlugs.Append(plan.Filters.CategorySlug)
+                .Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+            var placeholderCategory = requestedCategorySlugs.FirstOrDefault(x => x!.StartsWith("src-cat-",
+                StringComparison.OrdinalIgnoreCase));
+            if (placeholderCategory is not null)
+            {
+                SetRetrievalCause(timing, "catalog-availability", "placeholder-only-category");
+                var categoryName = vocabulary.Categories.FirstOrDefault(x => x.Slug == placeholderCategory)?.Name;
+                var categoryLabel = string.IsNullOrWhiteSpace(categoryName) ? "این دسته" : $"دستهٔ «{categoryName}»";
+                return Result($"{categoryLabel} در کاتالوگ ثبت شده، اما فعلاً محصول واقعیِ قابل پیشنهاد برای آن نداریم. رکورد جاینگهدار را نمایش نمی‌دهم.",
+                    [], "no-results", responseNotice);
+            }
+
+            if (effectivePlan.Filters.IncludeIngredientSlugs.Length > 0)
+            {
+                var ingredientNames = vocabulary.Ingredients
+                    .Where(x => effectivePlan.Filters.IncludeIngredientSlugs.Contains(x.Slug))
+                    .Select(x => x.Name).ToArray();
+                SetRetrievalCause(timing, "catalog-availability", "requested-ingredient-not-recorded-on-eligible-products");
+                var ingredientList = string.Join("، ", ingredientNames);
+                return Result($"در حال حاضر محصولی که ترکیب «{ingredientList}» آن در اطلاعات کاتالوگ ثبت شده باشد، با بقیهٔ درخواست شما پیدا نشد. می‌توانید ترکیب یا نوع محصول را تغییر دهید.",
+                    [], "no-results", responseNotice);
+            }
+
+            if (effectivePlan.Filters.CategorySlug == "sun-screen"
+                && effectivePlan.Filters.Shades.Length > 0
+                && retrieval.Diagnostics?.FirstRestoringFilter == "shade")
+            {
+                SetRetrievalCause(timing, "catalog-availability", "requested-sunscreen-shade-not-recorded");
+                return Result("در کاتالوگ برای ضدآفتاب‌ها رنگ ثبت نشده است؛ بنابراین نمی‌توانم روشن‌بودن رنگ را تأیید کنم یا ضدآفتاب بی‌رنگ را به‌جای آن پیشنهاد بدهم.",
+                    [], "no-results", responseNotice);
+            }
+
             return Result("محصول مرتبطی مطابق فیلترها و اطلاعات فعلی پیدا نشد. نوع محصول یا فیلترها را تغییر دهید.", [],
-                "no-results");
+                "no-results", responseNotice);
         }
 
         if (intent.Intent is ConsultationIntent.PriceInquiry or ConsultationIntent.AvailabilityInquiry
             or ConsultationIntent.ProductDetails or ConsultationIntent.ProductComparison)
         {
             var fresh = (await MeasureAsync(
-                () => repository.LoadAsync(retrieval.Products.Select(x => x.Product.Id), plan, ct),
+                () => repository.LoadAsync(retrieval.Products.Select(x => x.Product.Id), effectivePlan, ct),
                 elapsed => timing.ProductLoadMs = (timing.ProductLoadMs ?? 0) + elapsed)).ToDictionary(p => p.Id);
             var matches = retrieval.Products.Where(m => fresh.ContainsKey(m.Product.Id))
                 .Take(intent.Intent == ConsultationIntent.ProductComparison ? 2 : 5)
@@ -360,10 +425,10 @@ public sealed class ConsultationService(
             }
 
             return Finish(Result(ConsultationAnswerFormatter.InformationAnswer(matches, intent.Intent, vocabulary),
-                matches, "catalog"));
+                matches, "catalog", responseNotice));
         }
 
-        var context = retrieval.Products.Where(m => RecommendationValidator.CanRecommend(m.Product, plan.Filters))
+        var context = retrieval.Products.Where(m => RecommendationValidator.CanRecommend(m.Product, effectivePlan.Filters))
             .Take(5).ToArray();
         if (context.Length == 0)
         {
@@ -374,7 +439,7 @@ public sealed class ConsultationService(
         ValidatedConsultation? validated = null;
         var mode = "model";
         string? notice = null;
-        var useGroundedFastPath = plan.Source is "explicit-category-rule"
+        var useGroundedFastPath = effectivePlan.Source is "explicit-category-rule"
             or "explicit-filter-rules" or "filters-only";
         if (useGroundedFastPath)
         {
@@ -386,7 +451,7 @@ public sealed class ConsultationService(
             {
                 var generated = await MeasureAsync(() => GenerateAnswerAsync(message, intent, context, ct),
                     elapsed => timing.AnswerGenerationMs = elapsed);
-                validated = await MeasureAsync(() => validator.ValidateAsync(generated, context, plan, ct),
+                validated = await MeasureAsync(() => validator.ValidateAsync(generated, context, effectivePlan, ct),
                     elapsed => timing.ValidationMs = elapsed);
             }
             catch (Exception ex) when (!ct.IsCancellationRequested &&
@@ -401,7 +466,9 @@ public sealed class ConsultationService(
         if (validated is null)
         {
             mode = "catalog";
-            notice = useGroundedFastPath ? null : "پاسخ مدل قابل استفاده نبود؛ نتیجه از اطلاعات فعلی کاتالوگ تهیه شد.";
+            notice = responseNotice ?? (useGroundedFastPath
+                ? null
+                : "پاسخ مدل قابل استفاده نبود؛ نتیجه از اطلاعات فعلی کاتالوگ تهیه شد.");
             var fallback = new ConsultationResult
             {
                 Answer = GroundedAnswers.Answers[0],
@@ -409,7 +476,7 @@ public sealed class ConsultationService(
                     .Select(x => new ProductRecommendation(x.Product.Id, GroundedAnswers.Reason(x.Product))).ToList()
             };
             validated = await MeasureAsync(
-                () => validator.ValidateAsync(fallback, context, plan, ct),
+                () => validator.ValidateAsync(fallback, context, effectivePlan, ct),
                 elapsed => timing.ValidationMs = (timing.ValidationMs ?? 0) + elapsed);
         }
 
@@ -435,6 +502,7 @@ public sealed class ConsultationService(
         filters.CategorySlugs,
         filters.BrandSlug,
         filters.BrandSlugs,
+        filters.ExcludedBrandSlugs,
         filters.SkinType,
         filters.SkinTypes,
         filters.HairType,
@@ -450,7 +518,8 @@ public sealed class ConsultationService(
         filters.SizeValue,
         filters.SizeUnit,
         filters.FragranceFree,
-        filters.ExcludeIngredientSlugs
+        filters.ExcludeIngredientSlugs,
+        filters.IncludeIngredientSlugs
     };
 
     private static string? SingleOrSole(string? single, string[] values)
@@ -552,7 +621,8 @@ public sealed class ConsultationService(
                || request.Finish is not null
                || request.SizeValue.HasValue
                || request.FragranceFree.HasValue
-               || request.ExcludeIngredientSlugs.Length > 0;
+               || request.ExcludeIngredientSlugs.Length > 0
+               || request.IncludeIngredientSlugs.Length > 0;
     }
 
     private static bool IsRecommendationRequest(string message)

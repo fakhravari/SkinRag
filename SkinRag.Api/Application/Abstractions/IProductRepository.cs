@@ -13,5 +13,7 @@ public interface IProductRepository
     Task<ZeroResultFilterDiagnosis> DiagnoseZeroResultsAsync(SearchPlan plan, CancellationToken ct);
     Task<IReadOnlyDictionary<int, int>> CountConcernMatchesAsync(int[] productIds, string[] concernSlugs,
         CancellationToken ct);
+    Task<IReadOnlyDictionary<int, int>> CountProfileMatchesAsync(int[] productIds, string[] profileSlugs,
+        CancellationToken ct);
     Task<IReadOnlyList<ProductDto>> LoadAsync(IEnumerable<int> ids, SearchPlan plan, CancellationToken ct);
 }

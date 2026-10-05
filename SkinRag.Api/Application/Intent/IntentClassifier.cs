@@ -35,6 +35,21 @@ public sealed partial class IntentClassifier(
             };
         }
 
+        if (ConsultationIntentRules.IsMedicalInfectionRequest(message))
+        {
+            return new IntentDecision(ConsultationIntent.Unsafe, 1, "medical-infection-rule");
+        }
+
+        if (ConsultationIntentRules.IsNoRinseDryShampooRequest(message))
+        {
+            return new IntentDecision(ConsultationIntent.Unclear, 1, "unsupported-no-rinse-dry-shampoo");
+        }
+
+        if (ConsultationIntentRules.IsMoisturizerTextureComparisonRequest(message))
+        {
+            return new IntentDecision(ConsultationIntent.SkinConsultation, 1, "moisturizer-texture-comparison-rule");
+        }
+
         // Obvious unrelated requests stop before any model, SQL or embeddings.
         var normalized = PersianText.Normalize(message);
         if (Has(normalized, "جوک", "لطیفه", "joke", "سیاست", "فوتبال", "برنامه نویسی"))
@@ -112,6 +127,11 @@ public sealed partial class IntentClassifier(
                     "Intent resolved by catalog rule {RuleSource}; matched {MatchedPhraseCount} product phrases",
                     ruleDecision.Source, diagnostics.MatchedProductPhraseCount);
                 return ruleDecision;
+            }
+
+            if (ConsultationIntentRules.MatchGenericHairProductRequest(message, diagnostics) is { } genericHair)
+            {
+                return genericHair;
             }
 
             logger.LogInformation(

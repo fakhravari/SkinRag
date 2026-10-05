@@ -35,7 +35,7 @@ public sealed class CatalogQueryService(IDbContextFactory<SkinRagDbContext> dbFa
     public async Task<ProductDto?> GetAsync(int id, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var product = await Hydrate(db.Products.AsNoTracking().Where(p => p.Id == id && p.IsActive))
+        var product = await Hydrate(Filter(db.Products.AsNoTracking().Where(p => p.Id == id), new CatalogFilters(), false))
             .SingleOrDefaultAsync(ct);
         return product == null ? null : ToDto(product, new CatalogFilters(), false);
     }
@@ -164,12 +164,15 @@ public sealed class CatalogQueryService(IDbContextFactory<SkinRagDbContext> dbFa
     public static IQueryable<Product> Filter(IQueryable<Product> query, CatalogFilters f, bool inStockOnly = true,
         CategoryScope? scope = null)
     {
-        query = query.Where(p => p.IsActive);
+        query = query.Where(p => p.IsActive && !p.Sku.StartsWith("src-cat-")
+                                 && (p.CategoryDetails == null || !p.CategoryDetails.Slug.StartsWith("src-cat-")));
         var domains = f.Domains.Append(f.Domain).Where(x => !string.IsNullOrWhiteSpace(x))
             .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var categorySlugs = f.CategorySlugs.Append(f.CategorySlug).Where(x => !string.IsNullOrWhiteSpace(x))
             .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var brandSlugs = f.BrandSlugs.Append(f.BrandSlug).Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var excludedBrandSlugs = f.ExcludedBrandSlugs.Where(x => !string.IsNullOrWhiteSpace(x))
             .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var skinTypes = f.SkinTypes.Append(f.SkinType).Where(x => !string.IsNullOrWhiteSpace(x))
             .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
@@ -200,6 +203,11 @@ public sealed class CatalogQueryService(IDbContextFactory<SkinRagDbContext> dbFa
         if (brandSlugs.Length > 0)
         {
             query = query.Where(p => p.BrandDetails != null && brandSlugs.Contains(p.BrandDetails.Slug));
+        }
+
+        if (excludedBrandSlugs.Length > 0)
+        {
+            query = query.Where(p => p.BrandDetails == null || !excludedBrandSlugs.Contains(p.BrandDetails.Slug));
         }
 
         if (skinTypes.Length > 0)
@@ -238,6 +246,15 @@ public sealed class CatalogQueryService(IDbContextFactory<SkinRagDbContext> dbFa
             query = query.Where(p =>
                 p.ProductIngredients.Any() &&
                 !p.ProductIngredients.Any(x => f.ExcludeIngredientSlugs.Contains(x.Ingredient.Slug)));
+        }
+
+        if (f.IncludeIngredientSlugs.Length > 0)
+        {
+            foreach (var slug in f.IncludeIngredientSlugs)
+            {
+                var requiredIngredient = slug;
+                query = query.Where(p => p.ProductIngredients.Any(x => x.Ingredient.Slug == requiredIngredient));
+            }
         }
 
         // Every condition must hold for the SAME variant; aggregate parent prices/stock are not authoritative.
@@ -323,6 +340,13 @@ public sealed class CatalogQueryService(IDbContextFactory<SkinRagDbContext> dbFa
             throw new ArgumentException("برند ناشناخته است.");
         }
 
+        if (f.ExcludedBrandSlugs.Length > 0
+            && await db.Brands.CountAsync(x => f.ExcludedBrandSlugs.Contains(x.Slug), ct)
+            != f.ExcludedBrandSlugs.Distinct(StringComparer.OrdinalIgnoreCase).Count())
+        {
+            throw new ArgumentException("برند مستثنا ناشناخته است.");
+        }
+
         var concernSlugs = f.ConcernSlugs.Append(f.ConcernSlug).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
         if (concernSlugs.Length > 0 && await db.Concerns.CountAsync(x => concernSlugs.Contains(x.Slug), ct)
             != concernSlugs.Distinct(StringComparer.OrdinalIgnoreCase).Count())
@@ -351,6 +375,16 @@ public sealed class CatalogQueryService(IDbContextFactory<SkinRagDbContext> dbFa
             if (known.Count != f.ExcludeIngredientSlugs.Distinct(StringComparer.OrdinalIgnoreCase).Count())
             {
                 throw new ArgumentException("یک یا چند ترکیب مستثنا ناشناخته است.");
+            }
+        }
+
+        if (f.IncludeIngredientSlugs.Length > 0)
+        {
+            var known = await db.Ingredients.Where(x => f.IncludeIngredientSlugs.Contains(x.Slug))
+                .Select(x => x.Slug).ToListAsync(ct);
+            if (known.Count != f.IncludeIngredientSlugs.Distinct(StringComparer.OrdinalIgnoreCase).Count())
+            {
+                throw new ArgumentException("یک یا چند ترکیب درخواستی ناشناخته است.");
             }
         }
 

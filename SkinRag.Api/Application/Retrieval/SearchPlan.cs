@@ -14,7 +14,9 @@ public sealed record SearchPlan(
     bool InStockOnly = true,
     bool NeedsMoreInformation = false,
     string? FollowUpQuestion = null,
-    string Source = "model");
+    string Source = "model",
+    string[]? InferredProfileSlugs = null,
+    string? Notice = null);
 
 public sealed record CatalogVocabulary(
     Category[] Categories,
@@ -35,7 +37,8 @@ public sealed record RetrievalResult(
     double EmbeddingMs = 0,
     double ProductLoadMs = 0,
     int[]? EligibleProductIds = null,
-    RetrievalDiagnostics? Diagnostics = null);
+    RetrievalDiagnostics? Diagnostics = null,
+    SearchPlan? EffectivePlan = null);
 
 public sealed record RetrievalDiagnostics(
     string Stage,
